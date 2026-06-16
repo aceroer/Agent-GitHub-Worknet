@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "structure-rule-kit"
+version = "0.1.0"
+description = "A project-structure rule layer for AI coding and research agents."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+  { name = "Structure Rule Kit Contributors" }
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+structure-rule = "structure_rule_kit.cli:main"
+
+[tool.setuptools.package-data]
+structure_rule_kit = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
