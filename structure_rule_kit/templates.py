@@ -157,6 +157,17 @@ Add local GitHub-like lifecycle semantics:
 - milestones
 - GitHub-ready markdown export
 
+## Version 0.8
+
+Add a dry-run GitHub bridge layer:
+
+- remote metadata for local network records
+- label export
+- batch issue export
+- milestone export
+- dry-run sync plans
+- no remote API writes in this phase
+
 ## Deferred Ideas
 
 - Optional project presets, only if they support the scriptable integration layer.

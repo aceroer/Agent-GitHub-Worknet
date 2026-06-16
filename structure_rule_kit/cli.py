@@ -25,6 +25,13 @@ from .context_prune import build_context_prune
 from .decision_log import append_decision_log
 from .exporter import export_structure
 from .generator import init_structure
+from .github_bridge import (
+    build_github_sync_plan,
+    export_github_issues,
+    export_github_labels,
+    export_github_milestones,
+    github_sync,
+)
 from .handoff import build_handoff_pack
 from .mcp_manifest import build_mcp_manifest
 from .mcp_scaffold import scaffold_mcp
@@ -385,6 +392,27 @@ def main(argv: list[str] | None = None) -> int:
     github_export_parser.add_argument("--type", choices=["issue", "pr"], default="issue")
     github_export_parser.add_argument("--id", required=True)
     github_export_parser.add_argument("--path", default=".")
+
+    github_dry_run_parser = subparsers.add_parser("github-dry-run", help="Build a dry-run GitHub sync plan")
+    github_dry_run_parser.add_argument("--path", default=".")
+    github_dry_run_parser.add_argument("--output", default="structure/network/github_export/sync_plan.md")
+
+    github_labels_parser = subparsers.add_parser("github-labels-export", help="Export local labels as GitHub JSON")
+    github_labels_parser.add_argument("--path", default=".")
+    github_labels_parser.add_argument("--output", default="structure/network/github_export/labels.json")
+
+    github_issues_parser = subparsers.add_parser("github-issues-export", help="Export all local issues as markdown")
+    github_issues_parser.add_argument("--path", default=".")
+    github_issues_parser.add_argument("--output-dir", default="structure/network/github_export/issues")
+
+    github_milestones_parser = subparsers.add_parser("github-milestones-export", help="Export local milestones as JSON")
+    github_milestones_parser.add_argument("--path", default=".")
+    github_milestones_parser.add_argument("--output", default="structure/network/github_export/milestones.json")
+
+    github_sync_parser = subparsers.add_parser("github-sync", help="Run GitHub bridge sync preparation")
+    github_sync_parser.add_argument("--path", default=".")
+    github_sync_parser.add_argument("--dry-run", action="store_true", default=True)
+    github_sync_parser.add_argument("--apply", action="store_true", help="Reserved for a future real API sync")
 
     args = parser.parse_args(argv)
 
@@ -848,6 +876,36 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "github-export":
         report = github_export(args.path, item_type=args.type, item_id=args.id)
         print(f"Wrote {Path(report['output'])}")
+        return 0
+
+    if args.command == "github-dry-run":
+        report = build_github_sync_plan(args.path, output=args.output)
+        print(f"Wrote {Path(report['output'])}")
+        print(f"Mode: {report['mode']}")
+        return 0
+
+    if args.command == "github-labels-export":
+        report = export_github_labels(args.path, output=args.output)
+        print(f"Wrote {Path(report['output'])} with {report['labels']} labels.")
+        return 0
+
+    if args.command == "github-issues-export":
+        report = export_github_issues(args.path, output_dir=args.output_dir)
+        print(f"Wrote {report['issues']} issues to {Path(report['output_dir'])}")
+        return 0
+
+    if args.command == "github-milestones-export":
+        report = export_github_milestones(args.path, output=args.output)
+        print(f"Wrote {Path(report['output'])} with {report['milestones']} milestones.")
+        return 0
+
+    if args.command == "github-sync":
+        report = github_sync(args.path, dry_run=not args.apply)
+        if not report["ok"]:
+            print(report["message"])
+            return 1
+        print(f"GitHub bridge: {report['status']}")
+        print(f"Plan: {Path(report['plan']['output'])}")
         return 0
 
     parser.error("Unknown command")

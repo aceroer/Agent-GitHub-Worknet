@@ -94,6 +94,11 @@ structure-rule comment-add --target issue-0001 --body "needs tests"
 structure-rule timeline --target issue-0001
 structure-rule milestone-create --title "v0.7"
 structure-rule github-export --type issue --id issue-0001
+structure-rule github-labels-export
+structure-rule github-issues-export
+structure-rule github-milestones-export
+structure-rule github-dry-run
+structure-rule github-sync --dry-run
 ```
 
 These commands do not prescribe how a project must be organized beyond the
@@ -164,6 +169,15 @@ Version 0.7 adds local GitHub-like lifecycle semantics:
 - comments and timelines
 - milestones
 - GitHub-ready markdown export
+
+Version 0.8 adds a dry-run GitHub bridge layer:
+
+- local remote metadata for issues, PRs, and milestones
+- label export to `github_export/labels.json`
+- batch issue export to `github_export/issues/`
+- milestone export to `github_export/milestones.json`
+- dry-run sync plan generation
+- `github-sync --dry-run` for a complete export pass without remote API calls
 
 ## Agent Toolbox
 
@@ -268,6 +282,9 @@ structure/network/
 ├── prs/
 ├── reviews/
 ├── projects/
+├── comments/
+├── milestones/
+├── github_export/
 └── network_log.jsonl
 ```
 
@@ -350,6 +367,35 @@ structure-rule github-export --type issue --id issue-0001
 
 `pr-merge` is semantic: it marks the local PR as merged, closes the linked issue
 when present, updates the board, and records the merge in `network_log.jsonl`.
+
+## GitHub Bridge
+
+0.8 prepares the local network for future remote GitHub sync while staying
+local-first and dry-run only.
+
+```bash
+structure-rule github-labels-export
+structure-rule github-issues-export
+structure-rule github-milestones-export
+structure-rule github-dry-run
+structure-rule github-sync --dry-run
+```
+
+The bridge writes export files under `structure/network/github_export/` and
+adds a `remote` metadata block to local issues, PRs, and milestones:
+
+```json
+{
+  "provider": "github",
+  "repo": null,
+  "number": null,
+  "url": null,
+  "synced_at": null
+}
+```
+
+`github-sync --dry-run` produces labels, issue markdown, milestone JSON, and a
+sync plan. It does not create or modify any remote GitHub resources.
 
 ## Example Workflow
 

@@ -39,6 +39,11 @@ exports, and network snapshot links.
 Add local GitHub-like issue, PR, comment, timeline, milestone, and export
 lifecycle commands.
 
+## Version 0.8
+
+Add a dry-run GitHub bridge for labels, issues, milestones, remote metadata, and
+sync-plan export without remote API writes.
+
 ## Deferred Ideas
 
 - Optional presets, only if they support the integration tools.

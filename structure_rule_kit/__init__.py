@@ -20,6 +20,14 @@ from .context_prune import build_context_prune
 from .decision_log import append_decision_log
 from .exporter import export_structure
 from .generator import init_structure
+from .github_bridge import (
+    build_github_sync_plan,
+    ensure_remote_metadata,
+    export_github_issues,
+    export_github_labels,
+    export_github_milestones,
+    github_sync,
+)
 from .handoff import build_handoff_pack
 from .mcp_manifest import build_mcp_manifest
 from .mcp_scaffold import scaffold_mcp
@@ -69,6 +77,7 @@ __all__ = [
     "build_context_pack",
     "build_context_prune",
     "build_handoff_pack",
+    "build_github_sync_plan",
     "build_mcp_manifest",
     "build_project_board",
     "build_rag_index",
@@ -88,8 +97,12 @@ __all__ = [
     "export_agent",
     "export_all_agents",
     "export_context",
+    "export_github_issues",
+    "export_github_labels",
+    "export_github_milestones",
     "export_skill",
     "github_export",
+    "github_sync",
     "init_context",
     "init_network",
     "init_structure",
@@ -114,6 +127,7 @@ __all__ = [
     "sync_network",
     "timeline",
     "end_session",
+    "ensure_remote_metadata",
     "summarize_structure",
     "update_status",
     "update_issue_status",
