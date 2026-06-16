@@ -83,23 +83,50 @@ Not specified yet.
 
 ## Version 0.1
 
-Not specified yet.
+Create a stable project structure layer:
+
+- `STRUCTURE_RULE.md`
+- `structure/project_plan.md`
+- `structure/roadmap.md`
+- `structure/rules.md`
+- `structure/action_protocol.md`
+- `structure/metrics.md`
+- `structure/toolbox.md`
+- `structure/important_files.md`
+- `structure/status.md`
+- `structure/agent_notes.md`
+
+Support `init`, `validate`, `summary`, and `export`.
 
 ## Version 0.2
 
-Not specified yet.
+Add scriptable agent integration tools rather than more templates:
+
+- build a compact RAG index from the structure files
+- export bounded context packs for coding and research agents
+- generate and check MCP-facing tool/resource manifests
+- scaffold local skill entry points from an existing project structure
+- audit whether an agent has enough structure to start safely
 
 ## Version 0.3
 
-Not specified yet.
+Add lifecycle automation:
+
+- update status from command-line events
+- check whether a task is ready for agent execution
+- generate agent handoff packets
+- record tool runs and verification evidence
 
 ## Long-Term Direction
 
-Not specified yet.
+Become a lightweight structure/runtime bridge for agent workflows.
+
+The kit should not become a template marketplace. It should help agents read,
+index, validate, expose, and reuse the project structure that already exists.
 
 ## Deferred Ideas
 
-- Not specified yet.
+- Optional project presets, only if they support the scriptable integration layer.
 """,
         ),
         (

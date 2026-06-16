@@ -2,20 +2,27 @@
 
 ## Version 0.1
 
-Not specified yet.
+Create the basic structure files and validation/export commands.
 
 ## Version 0.2
 
-Not specified yet.
+Add scriptable agent integration:
+
+- RAG index generation
+- compact context-pack export
+- MCP manifest checks
+- skill scaffold helpers
+- agent-readiness audit
 
 ## Version 0.3
 
-Not specified yet.
+Add lifecycle automation for status updates, handoffs, and verification logs.
 
 ## Long-Term Direction
 
-Not specified yet.
+Make project structure readable and reusable by coding agents, research agents,
+MCP servers, and local skills.
 
 ## Deferred Ideas
 
-- Not specified yet.
+- Optional presets, only if they support the integration tools.
