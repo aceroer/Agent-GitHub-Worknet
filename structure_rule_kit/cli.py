@@ -30,15 +30,26 @@ from .mcp_manifest import build_mcp_manifest
 from .mcp_scaffold import scaffold_mcp
 from .mcp_server import run_server
 from .network import (
+    add_comment,
+    assign_issue,
     build_project_board,
+    create_milestone,
     create_issue,
     create_network_branch,
     create_pr,
     create_review,
+    github_export,
     init_network,
+    label_issue,
+    list_comments,
     list_issues,
+    list_milestones,
+    merge_pr,
     snapshot_network,
     sync_network,
+    timeline,
+    update_issue_status,
+    update_pr_status,
 )
 from .rag_index import build_rag_index
 from .repo_map import scan_repo_map
@@ -312,6 +323,68 @@ def main(argv: list[str] | None = None) -> int:
     network_snapshot_parser.add_argument("--path", default=".")
     network_snapshot_parser.add_argument("--message", default="Agent network snapshot")
     network_snapshot_parser.add_argument("--target", default="codex", choices=["codex", "claude", "cursor", "generic"])
+
+    issue_close_parser = subparsers.add_parser("issue-close", help="Close a local agent issue")
+    issue_close_parser.add_argument("issue")
+    issue_close_parser.add_argument("--path", default=".")
+
+    issue_reopen_parser = subparsers.add_parser("issue-reopen", help="Reopen a local agent issue")
+    issue_reopen_parser.add_argument("issue")
+    issue_reopen_parser.add_argument("--path", default=".")
+
+    issue_assign_parser = subparsers.add_parser("issue-assign", help="Assign a local agent issue")
+    issue_assign_parser.add_argument("issue")
+    issue_assign_parser.add_argument("--assignee", default="")
+    issue_assign_parser.add_argument("--path", default=".")
+
+    issue_label_parser = subparsers.add_parser("issue-label", help="Add labels to a local agent issue")
+    issue_label_parser.add_argument("issue")
+    issue_label_parser.add_argument("--label", action="append", default=[])
+    issue_label_parser.add_argument("--path", default=".")
+
+    pr_ready_parser = subparsers.add_parser("pr-ready", help="Mark a local agent PR ready for review")
+    pr_ready_parser.add_argument("pr")
+    pr_ready_parser.add_argument("--path", default=".")
+
+    pr_close_parser = subparsers.add_parser("pr-close", help="Close a local agent PR")
+    pr_close_parser.add_argument("pr")
+    pr_close_parser.add_argument("--path", default=".")
+
+    pr_merge_parser = subparsers.add_parser("pr-merge", help="Semantically merge a local agent PR")
+    pr_merge_parser.add_argument("pr")
+    pr_merge_parser.add_argument("--path", default=".")
+    pr_merge_parser.add_argument("--method", default="semantic")
+
+    comment_add_parser = subparsers.add_parser("comment-add", help="Add a comment to an issue or PR")
+    comment_add_parser.add_argument("--target", required=True)
+    comment_add_parser.add_argument("--author", default="agent")
+    comment_add_parser.add_argument("--body", default="")
+    comment_add_parser.add_argument("--path", default=".")
+
+    comment_list_parser = subparsers.add_parser("comment-list", help="List comments for an issue or PR")
+    comment_list_parser.add_argument("--target", default="")
+    comment_list_parser.add_argument("--path", default=".")
+    comment_list_parser.add_argument("--json", action="store_true")
+
+    timeline_parser = subparsers.add_parser("timeline", help="Show local network timeline")
+    timeline_parser.add_argument("--target", default="")
+    timeline_parser.add_argument("--path", default=".")
+    timeline_parser.add_argument("--json", action="store_true")
+
+    milestone_create_parser = subparsers.add_parser("milestone-create", help="Create a local milestone")
+    milestone_create_parser.add_argument("--title", default="")
+    milestone_create_parser.add_argument("--due", default="")
+    milestone_create_parser.add_argument("--description", default="")
+    milestone_create_parser.add_argument("--path", default=".")
+
+    milestone_list_parser = subparsers.add_parser("milestone-list", help="List local milestones")
+    milestone_list_parser.add_argument("--path", default=".")
+    milestone_list_parser.add_argument("--json", action="store_true")
+
+    github_export_parser = subparsers.add_parser("github-export", help="Export issue or PR as GitHub-ready markdown")
+    github_export_parser.add_argument("--type", choices=["issue", "pr"], default="issue")
+    github_export_parser.add_argument("--id", required=True)
+    github_export_parser.add_argument("--path", default=".")
 
     args = parser.parse_args(argv)
 
@@ -698,6 +771,83 @@ def main(argv: list[str] | None = None) -> int:
         report = snapshot_network(args.path, message=args.message, target=args.target)
         print(f"Snapshot {report['snapshot']}: {Path(report['snapshot_file'])}")
         print(f"Updated network records: {len(report['updated'])}")
+        return 0
+
+    if args.command == "issue-close":
+        report = update_issue_status(args.path, args.issue, "closed")
+        print(f"Closed {report['id']}")
+        return 0
+
+    if args.command == "issue-reopen":
+        report = update_issue_status(args.path, args.issue, "open")
+        print(f"Reopened {report['id']}")
+        return 0
+
+    if args.command == "issue-assign":
+        report = assign_issue(args.path, args.issue, args.assignee)
+        print(f"Assigned {report['id']} to {args.assignee}")
+        return 0
+
+    if args.command == "issue-label":
+        report = label_issue(args.path, args.issue, args.label)
+        print(f"Labeled {report['id']}")
+        return 0
+
+    if args.command == "pr-ready":
+        report = update_pr_status(args.path, args.pr, "ready")
+        print(f"Ready {report['id']}")
+        return 0
+
+    if args.command == "pr-close":
+        report = update_pr_status(args.path, args.pr, "closed")
+        print(f"Closed {report['id']}")
+        return 0
+
+    if args.command == "pr-merge":
+        report = merge_pr(args.path, args.pr, method=args.method)
+        print(f"Merged {report['id']}")
+        return 0
+
+    if args.command == "comment-add":
+        report = add_comment(args.path, target=args.target, author=args.author, body=args.body)
+        print(f"Wrote {Path(report['output'])}")
+        return 0
+
+    if args.command == "comment-list":
+        comments = list_comments(args.path, target=args.target)
+        if args.json:
+            print(json.dumps(comments, indent=2))
+        else:
+            for comment in comments:
+                print(f"{comment['id']} {comment['target']} {comment['author']}: {comment['body']}")
+        return 0
+
+    if args.command == "timeline":
+        events = timeline(args.path, target=args.target)
+        if args.json:
+            print(json.dumps(events, indent=2))
+        else:
+            for event in events:
+                print(f"{event.get('timestamp', '')} {event.get('event', '')} {event.get('id', '')}")
+        return 0
+
+    if args.command == "milestone-create":
+        report = create_milestone(args.path, title=args.title, due=args.due, description=args.description)
+        print(f"Wrote {Path(report['output'])}")
+        return 0
+
+    if args.command == "milestone-list":
+        milestones = list_milestones(args.path)
+        if args.json:
+            print(json.dumps(milestones, indent=2))
+        else:
+            for milestone in milestones:
+                print(f"{milestone['id']} [{milestone['status']}] {milestone['title']}")
+        return 0
+
+    if args.command == "github-export":
+        report = github_export(args.path, item_type=args.type, item_id=args.id)
+        print(f"Wrote {Path(report['output'])}")
         return 0
 
     parser.error("Unknown command")

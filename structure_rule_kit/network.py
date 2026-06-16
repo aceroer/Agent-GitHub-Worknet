@@ -24,7 +24,7 @@ def _network_root(path: str) -> Path:
 
 def _ensure_network(path: str = ".") -> Path:
     root = _network_root(path)
-    for name in ["issues", "branches", "prs", "reviews", "projects"]:
+    for name in ["issues", "branches", "prs", "reviews", "projects", "comments", "milestones", "github_export"]:
         (root / name).mkdir(parents=True, exist_ok=True)
     log_path = root / "network_log.jsonl"
     if not log_path.exists():
@@ -61,10 +61,50 @@ def _load_items(directory: Path) -> list[dict]:
     return items
 
 
+def _find_item(root: Path, folder: str, item_id: str) -> tuple[Path, dict]:
+    for path in (root / folder).glob(f"{item_id}*.json"):
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        return path, payload
+    raise FileNotFoundError(f"{folder}/{item_id}")
+
+
+def _update_item(root: Path, folder: str, item_id: str, updates: dict, event: str) -> dict:
+    path, payload = _find_item(root, folder, item_id)
+    payload.update(updates)
+    payload["updated_at"] = _now()
+    _write_json(path, payload)
+    _append_log(root, event, {"id": item_id, "updates": updates})
+    return {"output": str(path), "id": item_id, "payload": payload}
+
+
 def init_network(path: str = ".") -> dict:
     root = _ensure_network(path)
     _append_log(root, "network_init", {})
     return {"output": str(root)}
+
+
+def update_issue_status(path: str = ".", issue: str = "", status: str = "closed") -> dict:
+    root = _ensure_network(path)
+    return _update_item(root, "issues", issue, {"status": status}, f"issue_{status}")
+
+
+def assign_issue(path: str = ".", issue: str = "", assignee: str = "") -> dict:
+    root = _ensure_network(path)
+    return _update_item(root, "issues", issue, {"assignee": assignee}, "issue_assign")
+
+
+def label_issue(path: str = ".", issue: str = "", labels: list[str] | None = None) -> dict:
+    root = _ensure_network(path)
+    item_path, payload = _find_item(root, "issues", issue)
+    existing = list(payload.get("labels", []))
+    for label in labels or []:
+        if label not in existing:
+            existing.append(label)
+    payload["labels"] = existing
+    payload["updated_at"] = _now()
+    _write_json(item_path, payload)
+    _append_log(root, "issue_label", {"id": issue, "labels": labels or []})
+    return {"output": str(item_path), "id": issue, "payload": payload}
 
 
 def create_issue(
@@ -156,6 +196,28 @@ def create_pr(
     return {"output": str(output), "id": pr_id}
 
 
+def update_pr_status(path: str = ".", pr: str = "", status: str = "closed") -> dict:
+    root = _ensure_network(path)
+    return _update_item(root, "prs", pr, {"status": status}, f"pr_{status}")
+
+
+def merge_pr(path: str = ".", pr: str = "", method: str = "semantic") -> dict:
+    root = _ensure_network(path)
+    pr_path, payload = _find_item(root, "prs", pr)
+    payload["status"] = "merged"
+    payload["merge_method"] = method
+    payload["merged_at"] = _now()
+    payload["updated_at"] = _now()
+    _write_json(pr_path, payload)
+    linked_issue = payload.get("linked_issue")
+    issue_output = ""
+    if linked_issue:
+        issue_output = update_issue_status(path, linked_issue, "closed")["output"]
+    _append_log(root, "pr_merge", {"id": pr, "method": method, "linked_issue": linked_issue})
+    build_project_board(path)
+    return {"output": str(pr_path), "id": pr, "linked_issue_output": issue_output}
+
+
 def create_review(
     path: str = ".",
     pr: str = "",
@@ -177,6 +239,113 @@ def create_review(
     _write_json(output, payload)
     _append_log(root, "review_create", {"id": review_id, "pr": pr, "decision": decision})
     return {"output": str(output), "id": review_id}
+
+
+def add_comment(path: str = ".", target: str = "", author: str = "", body: str = "") -> dict:
+    root = _ensure_network(path)
+    target_dir = root / "comments" / target
+    target_dir.mkdir(parents=True, exist_ok=True)
+    comment_id = _next_id(target_dir, "comment")
+    payload = {
+        "id": comment_id,
+        "target": target,
+        "author": author or "agent",
+        "body": body.strip() or "Not specified.",
+        "created_at": _now(),
+    }
+    output = target_dir / f"{comment_id}.json"
+    _write_json(output, payload)
+    _append_log(root, "comment_add", {"id": comment_id, "target": target})
+    return {"output": str(output), "id": comment_id}
+
+
+def list_comments(path: str = ".", target: str = "") -> list[dict]:
+    root = _ensure_network(path)
+    if target:
+        return _load_items(root / "comments" / target)
+    comments = []
+    for directory in sorted((root / "comments").glob("*")):
+        if directory.is_dir():
+            comments.extend(_load_items(directory))
+    return comments
+
+
+def timeline(path: str = ".", target: str = "") -> list[dict]:
+    root = _ensure_network(path)
+    events = []
+    log_path = root / "network_log.jsonl"
+    if log_path.exists():
+        for line in log_path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            record = json.loads(line)
+            if not target or record.get("id") == target or record.get("target") == target or record.get("pr") == target:
+                events.append(record)
+    for comment in list_comments(path, target):
+        events.append({"timestamp": comment["created_at"], "event": "comment", "id": comment["id"], "target": comment["target"]})
+    return sorted(events, key=lambda item: item.get("timestamp", ""))
+
+
+def create_milestone(path: str = ".", title: str = "", due: str = "", description: str = "") -> dict:
+    root = _ensure_network(path)
+    milestone_id = _next_id(root / "milestones", "milestone")
+    payload = {
+        "id": milestone_id,
+        "title": title.strip() or "Untitled milestone",
+        "status": "open",
+        "due": due,
+        "description": description.strip() or "Not specified.",
+        "created_at": _now(),
+        "updated_at": _now(),
+    }
+    output = root / "milestones" / f"{milestone_id}-{_slugify(payload['title'])}.json"
+    _write_json(output, payload)
+    _append_log(root, "milestone_create", {"id": milestone_id, "title": payload["title"]})
+    return {"output": str(output), "id": milestone_id}
+
+
+def list_milestones(path: str = ".") -> list[dict]:
+    root = _ensure_network(path)
+    return _load_items(root / "milestones")
+
+
+def github_export(path: str = ".", item_type: str = "issue", item_id: str = "") -> dict:
+    root = _ensure_network(path)
+    folder = "issues" if item_type == "issue" else "prs"
+    _, payload = _find_item(root, folder, item_id)
+    output = root / "github_export" / f"{item_id}.md"
+    if item_type == "issue":
+        content = f"""# {payload['title']}
+
+Status: {payload.get('status')}
+
+Labels: {', '.join(payload.get('labels', [])) or 'None'}
+
+Assignee: {payload.get('assignee') or 'None'}
+
+## Body
+
+{payload.get('body') or 'Not specified.'}
+"""
+    else:
+        content = f"""# {payload['title']}
+
+Status: {payload.get('status')}
+
+Branch: {payload.get('branch') or 'None'}
+
+Linked issue: {payload.get('linked_issue') or 'None'}
+
+Checks: {', '.join(payload.get('checks', [])) or 'None'}
+
+## Body
+
+{payload.get('body') or 'Not specified.'}
+"""
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(content, encoding="utf-8")
+    _append_log(root, "github_export", {"type": item_type, "id": item_id, "output": str(output)})
+    return {"output": str(output)}
 
 
 def build_project_board(path: str = ".", output: str = "structure/network/projects/board.md") -> dict:

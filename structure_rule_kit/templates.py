@@ -147,6 +147,16 @@ Add Context Git integration:
 - context export packets
 - network snapshot links
 
+## Version 0.7
+
+Add local GitHub-like lifecycle semantics:
+
+- issue assignment, labels, close, and reopen
+- PR ready, close, and semantic merge
+- comments and timelines
+- milestones
+- GitHub-ready markdown export
+
 ## Deferred Ideas
 
 - Optional project presets, only if they support the scriptable integration layer.

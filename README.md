@@ -84,6 +84,16 @@ structure-rule context-tag v0.6-plan --snapshot 0001
 structure-rule context-export
 structure-rule context-route
 structure-rule network-snapshot --message "parser ready for review"
+structure-rule issue-close issue-0001
+structure-rule issue-reopen issue-0001
+structure-rule issue-assign issue-0001 --assignee codex
+structure-rule issue-label issue-0001 --label enhancement
+structure-rule pr-ready pr-0001
+structure-rule pr-merge pr-0001
+structure-rule comment-add --target issue-0001 --body "needs tests"
+structure-rule timeline --target issue-0001
+structure-rule milestone-create --title "v0.7"
+structure-rule github-export --type issue --id issue-0001
 ```
 
 These commands do not prescribe how a project must be organized beyond the
@@ -146,6 +156,14 @@ Version 0.6 adds a Context Git integration layer:
 - `context-tag` marks stable checkpoints
 - `context-export` writes a recovery packet for future agents
 - `network-snapshot` links local agent network objects to a context snapshot
+
+Version 0.7 adds local GitHub-like lifecycle semantics:
+
+- issue close/reopen/assign/label
+- PR ready/close/merge
+- comments and timelines
+- milestones
+- GitHub-ready markdown export
 
 ## Agent Toolbox
 
@@ -310,6 +328,28 @@ structure-rule network-snapshot --message "parser issue ready for review"
 It refreshes the local board and agent brief, creates a context snapshot, and
 writes the snapshot id back to local issue, PR, and review records that do not
 already have `linked_snapshot`.
+
+## Network Lifecycle
+
+0.7 turns local network records into a lightweight collaboration system:
+
+```bash
+structure-rule issue-assign issue-0001 --assignee codex
+structure-rule issue-label issue-0001 --label enhancement
+structure-rule issue-close issue-0001
+structure-rule issue-reopen issue-0001
+structure-rule pr-ready pr-0001
+structure-rule pr-merge pr-0001
+structure-rule comment-add --target issue-0001 --author reviewer --body "needs tests"
+structure-rule comment-list --target issue-0001
+structure-rule timeline --target issue-0001
+structure-rule milestone-create --title "v0.7"
+structure-rule milestone-list
+structure-rule github-export --type issue --id issue-0001
+```
+
+`pr-merge` is semantic: it marks the local PR as merged, closes the linked issue
+when present, updates the board, and records the merge in `network_log.jsonl`.
 
 ## Example Workflow
 

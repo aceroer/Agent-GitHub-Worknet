@@ -34,6 +34,11 @@ boards, and network sync.
 Add Context Git integration for workflow snapshots, semantic branches, tags,
 exports, and network snapshot links.
 
+## Version 0.7
+
+Add local GitHub-like issue, PR, comment, timeline, milestone, and export
+lifecycle commands.
+
 ## Deferred Ideas
 
 - Optional presets, only if they support the integration tools.
