@@ -18,6 +18,16 @@ from .handoff import build_handoff_pack
 from .mcp_manifest import build_mcp_manifest
 from .mcp_scaffold import scaffold_mcp
 from .mcp_server import run_server
+from .network import (
+    build_project_board,
+    create_issue,
+    create_network_branch,
+    create_pr,
+    create_review,
+    init_network,
+    list_issues,
+    sync_network,
+)
 from .rag_index import build_rag_index
 from .repo_map import scan_repo_map
 from .run_task import run_agent_task
@@ -196,6 +206,53 @@ def main(argv: list[str] | None = None) -> int:
     mcp_server_parser = subparsers.add_parser("mcp-server", help="Run a minimal JSON MCP-like resource endpoint")
     mcp_server_parser.add_argument("--path", default=".")
     mcp_server_parser.add_argument("--request", default="")
+
+    network_parser = subparsers.add_parser("network-init", help="Initialize local agent network folders")
+    network_parser.add_argument("--path", default=".")
+
+    issue_create_parser = subparsers.add_parser("issue-create", help="Create a local agent issue")
+    issue_create_parser.add_argument("--path", default=".")
+    issue_create_parser.add_argument("--title", default="")
+    issue_create_parser.add_argument("--body", default="")
+    issue_create_parser.add_argument("--label", action="append", default=[])
+    issue_create_parser.add_argument("--assignee", default="")
+    issue_create_parser.add_argument("--snapshot", default="")
+
+    issue_list_parser = subparsers.add_parser("issue-list", help="List local agent issues")
+    issue_list_parser.add_argument("--path", default=".")
+    issue_list_parser.add_argument("--status", default="")
+    issue_list_parser.add_argument("--json", action="store_true")
+
+    branch_create_parser = subparsers.add_parser("branch-create", help="Create a local agent branch record")
+    branch_create_parser.add_argument("--path", default=".")
+    branch_create_parser.add_argument("--name", default="")
+    branch_create_parser.add_argument("--purpose", default="")
+    branch_create_parser.add_argument("--issue", default="")
+    branch_create_parser.add_argument("--context-branch", default="")
+
+    pr_create_parser = subparsers.add_parser("pr-create", help="Create a local agent PR record")
+    pr_create_parser.add_argument("--path", default=".")
+    pr_create_parser.add_argument("--title", default="")
+    pr_create_parser.add_argument("--body", default="")
+    pr_create_parser.add_argument("--issue", default="")
+    pr_create_parser.add_argument("--branch", default="")
+    pr_create_parser.add_argument("--check", action="append", default=[])
+    pr_create_parser.add_argument("--snapshot", default="")
+
+    review_create_parser = subparsers.add_parser("review-create", help="Create a local agent review record")
+    review_create_parser.add_argument("--path", default=".")
+    review_create_parser.add_argument("--pr", default="")
+    review_create_parser.add_argument("--reviewer", default="")
+    review_create_parser.add_argument("--decision", default="comment", choices=["approve", "request-changes", "comment"])
+    review_create_parser.add_argument("--body", default="")
+
+    board_parser = subparsers.add_parser("project-board", help="Build local agent network board")
+    board_parser.add_argument("--path", default=".")
+    board_parser.add_argument("--output", default="structure/network/projects/board.md")
+
+    network_sync_parser = subparsers.add_parser("network-sync", help="Sync local agent network with agent ecosystem outputs")
+    network_sync_parser.add_argument("--path", default=".")
+    network_sync_parser.add_argument("--target", default="codex", choices=["codex", "claude", "cursor", "generic"])
 
     args = parser.parse_args(argv)
 
@@ -452,6 +509,78 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "mcp-server":
         print(json.dumps(run_server(args.path, args.request), indent=2))
         return 0
+
+    if args.command == "network-init":
+        report = init_network(args.path)
+        print(f"Initialized {Path(report['output'])}")
+        return 0
+
+    if args.command == "issue-create":
+        report = create_issue(
+            args.path,
+            title=args.title,
+            body=args.body,
+            labels=args.label,
+            assignee=args.assignee,
+            linked_snapshot=args.snapshot,
+        )
+        print(f"Wrote {Path(report['output'])}")
+        return 0
+
+    if args.command == "issue-list":
+        issues = list_issues(args.path, status=args.status)
+        if args.json:
+            print(json.dumps(issues, indent=2))
+        else:
+            for issue in issues:
+                print(f"{issue['id']} [{issue['status']}] {issue['title']}")
+        return 0
+
+    if args.command == "branch-create":
+        report = create_network_branch(
+            args.path,
+            name=args.name,
+            purpose=args.purpose,
+            issue=args.issue,
+            context_branch=args.context_branch,
+        )
+        print(f"Wrote {Path(report['output'])}")
+        return 0
+
+    if args.command == "pr-create":
+        report = create_pr(
+            args.path,
+            title=args.title,
+            body=args.body,
+            issue=args.issue,
+            branch=args.branch,
+            checks=args.check,
+            linked_snapshot=args.snapshot,
+        )
+        print(f"Wrote {Path(report['output'])}")
+        return 0
+
+    if args.command == "review-create":
+        report = create_review(
+            args.path,
+            pr=args.pr,
+            reviewer=args.reviewer,
+            decision=args.decision,
+            body=args.body,
+        )
+        print(f"Wrote {Path(report['output'])}")
+        return 0
+
+    if args.command == "project-board":
+        report = build_project_board(args.path, output=args.output)
+        print(f"Wrote {Path(report['output'])}")
+        return 0
+
+    if args.command == "network-sync":
+        report = sync_network(args.path, target=args.target)
+        print(f"Network sync: {report['status']}")
+        print(f"Board: {Path(report['board'])}")
+        return 0 if report["ready"] else 1
 
     parser.error("Unknown command")
     return 2

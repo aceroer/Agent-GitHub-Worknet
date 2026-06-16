@@ -67,6 +67,13 @@ structure-rule agent-export --target all
 structure-rule skill-export --name project-structure
 structure-rule agent-sync --target codex
 structure-rule mcp-server
+structure-rule network-init
+structure-rule issue-create --title "add parser"
+structure-rule branch-create --name parser --issue issue-0001
+structure-rule pr-create --title "implement parser" --issue issue-0001 --branch parser
+structure-rule review-create --pr pr-0001 --decision approve
+structure-rule project-board
+structure-rule network-sync --target codex
 ```
 
 These commands do not prescribe how a project must be organized beyond the
@@ -108,6 +115,17 @@ Version 0.4 adapts the workflow runner to external agent ecosystems:
 - `agent-sync` runs the full sync path for a target agent
 - `mcp-server` exposes Structure Rule files through a minimal JSON resource
   endpoint
+
+Version 0.5 adds a local agent network layer, a lightweight GitHub-like workflow
+for agent collaboration:
+
+- `issue-create` and `issue-list` manage local agent issues
+- `branch-create` records local exploration branches
+- `pr-create` records delivery packages and checks
+- `review-create` records review decisions
+- `project-board` writes a local board summary
+- `network-sync` connects the local network to agent exports, skills, brief, and
+  MCP manifest output
 
 ## Agent Toolbox
 
@@ -199,6 +217,33 @@ repo-map -> agent-ready -> context-prune -> agent-brief -> agent-export -> skill
 ```bash
 structure-rule mcp-server
 structure-rule mcp-server --request '{"method":"resources/read","params":{"uri":"structure-rule://STRUCTURE_RULE.md"}}'
+```
+
+## Agent Network
+
+The agent network layer stores local collaboration objects under:
+
+```text
+structure/network/
+├── issues/
+├── branches/
+├── prs/
+├── reviews/
+├── projects/
+└── network_log.jsonl
+```
+
+It is a local-first lightweight GitHub layer for agent work. Git still tracks
+code. Structure Rule Kit tracks the agent collaboration structure.
+
+```bash
+structure-rule network-init
+structure-rule issue-create --title "add parser" --label enhancement
+structure-rule branch-create --name parser --issue issue-0001
+structure-rule pr-create --title "implement parser" --issue issue-0001 --branch parser --check pytest
+structure-rule review-create --pr pr-0001 --decision approve
+structure-rule project-board
+structure-rule network-sync --target codex
 ```
 
 ## Example Workflow

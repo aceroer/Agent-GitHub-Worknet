@@ -24,6 +24,11 @@ session start/end, config defaults, and MCP scaffolding.
 Make project structure readable and reusable by coding agents, research agents,
 MCP servers, and local skills.
 
+## Version 0.5
+
+Add local agent network records for issues, branches, PRs, reviews, project
+boards, and network sync.
+
 ## Deferred Ideas
 
 - Optional presets, only if they support the integration tools.

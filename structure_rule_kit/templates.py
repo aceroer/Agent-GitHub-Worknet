@@ -125,6 +125,17 @@ Become a lightweight structure/runtime bridge for agent workflows.
 The kit should not become a template marketplace. It should help agents read,
 index, validate, expose, and reuse the project structure that already exists.
 
+## Version 0.5
+
+Add a local agent network layer:
+
+- local agent issues
+- local exploration branches
+- local PR records
+- local review records
+- local project board
+- network sync into agent exports and skills
+
 ## Deferred Ideas
 
 - Optional project presets, only if they support the scriptable integration layer.
