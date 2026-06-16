@@ -1,0 +1,16 @@
+{
+  "provider": "github",
+  "repo": "owner/name",
+  "sync_policy": {
+    "default_mode": "dry-run",
+    "create_missing_labels": false,
+    "create_missing_milestones": false,
+    "skip_missing_labels": false,
+    "pull_remote_state": true,
+    "write_sync_report": true
+  },
+  "paths": {
+    "network": "structure/network",
+    "sync_report": "structure/network/github_export/sync_report.md"
+  }
+}

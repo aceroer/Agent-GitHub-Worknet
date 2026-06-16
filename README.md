@@ -427,6 +427,14 @@ local issue's `remote` field. If the local issue has labels that do not exist on
 the remote repository, creation is blocked with a missing-label report unless
 `--skip-missing-labels` is passed.
 
+## Experimental Closure Layer
+
+The 1.0 closure experiments live under `experimental/closure/`.
+
+This folder is not part of the stable package API. It keeps real environment
+traces, GitHub doctor scripts, sync-report experiments, and the proposed closure
+roadmap in a public place before those pieces are promoted into stable commands.
+
 ## Example Workflow
 
 ```bash
