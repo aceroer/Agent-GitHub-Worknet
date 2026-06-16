@@ -49,6 +49,11 @@ sync-plan export without remote API writes.
 Add explicit `gh issue create` support for single and batch issue creation, with
 remote metadata write-back and duplicate protection.
 
+## Version 1.0
+
+Add Agent GitHub Worknet closure: repo config, doctor checks, label and
+milestone creation, remote state pullback, worknet status, and sync reports.
+
 ## Deferred Ideas
 
 - Optional presets, only if they support the integration tools.

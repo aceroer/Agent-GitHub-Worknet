@@ -2,10 +2,15 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
 from .network import _append_log, _ensure_network, _find_item, _load_items, _now, _write_json
+
+
+GITHUB_CONFIG = Path("structure/network/github_config.json")
+GITHUB_SYNC_REPORT = Path("structure/network/github_export/sync_report.md")
 
 
 def _remote_stub() -> dict:
@@ -16,6 +21,52 @@ def _remote_stub() -> dict:
         "url": None,
         "synced_at": None,
     }
+
+
+def _default_config(repo: str = "") -> dict:
+    return {
+        "provider": "github",
+        "repo": repo,
+        "sync_policy": {
+            "default_mode": "dry-run",
+            "create_missing_labels": False,
+            "create_missing_milestones": False,
+            "skip_missing_labels": False,
+            "pull_remote_state": True,
+            "write_sync_report": True,
+        },
+        "paths": {
+            "network": "structure/network",
+            "sync_report": str(GITHUB_SYNC_REPORT),
+        },
+    }
+
+
+def write_github_config(
+    path: str = ".",
+    repo: str = "",
+    output: str = str(GITHUB_CONFIG),
+    force: bool = False,
+) -> dict:
+    root = _ensure_network(path)
+    output_path = Path(path) / output
+    if output_path.exists() and not force:
+        return {"output": str(output_path), "created": False, "config": load_github_config(path, output)}
+    payload = _default_config(repo)
+    _write_json(output_path, payload)
+    _append_log(root, "github_config", {"output": str(output_path), "repo": repo, "created": True})
+    return {"output": str(output_path), "created": True, "config": payload}
+
+
+def load_github_config(path: str = ".", config: str = str(GITHUB_CONFIG)) -> dict:
+    config_path = Path(path) / config
+    if not config_path.exists():
+        return _default_config("")
+    return json.loads(config_path.read_text(encoding="utf-8"))
+
+
+def _resolve_repo(path: str, repo: str = "", config: str = str(GITHUB_CONFIG)) -> str:
+    return repo or load_github_config(path, config).get("repo", "")
 
 
 def _clean_item(payload: dict) -> dict:
@@ -149,6 +200,47 @@ def _run_gh(command: list[str], runner=None) -> subprocess.CompletedProcess:
     return run(command, capture_output=True, text=True)
 
 
+def _gh_json(command: list[str], runner=None) -> tuple[bool, object, str]:
+    result = _run_gh(command, runner=runner)
+    if result.returncode != 0:
+        return False, None, (result.stderr or result.stdout).strip()
+    try:
+        return True, json.loads(result.stdout or "null"), ""
+    except json.JSONDecodeError as exc:
+        return False, None, str(exc)
+
+
+def github_doctor(path: str = ".", repo: str = "", runner=None) -> dict:
+    repo = _resolve_repo(path, repo)
+    checks = []
+    gh_path = shutil.which("gh")
+    checks.append({"name": "gh-installed", "ok": gh_path is not None, "path": gh_path})
+    if gh_path is None:
+        return {"ok": False, "repo": repo, "checks": checks}
+    commands = [
+        ("gh-auth", ["gh", "auth", "status"]),
+        ("repo-view", ["gh", "repo", "view", repo, "--json", "name,owner,visibility,url"]),
+        ("issues-list", ["gh", "issue", "list", "--repo", repo, "--limit", "1", "--json", "number,state,title,url"]),
+        ("labels-list", ["gh", "label", "list", "--repo", repo, "--json", "name", "--limit", "1000"]),
+        ("milestones-list", ["gh", "api", f"repos/{repo}/milestones?state=all"]),
+    ]
+    for name, command in commands:
+        if not repo and name != "gh-auth":
+            checks.append({"name": name, "ok": False, "stderr": "repo is not configured"})
+            continue
+        result = _run_gh(command, runner=runner)
+        checks.append(
+            {
+                "name": name,
+                "ok": result.returncode == 0,
+                "returncode": result.returncode,
+                "stdout": result.stdout.strip(),
+                "stderr": result.stderr.strip(),
+            }
+        )
+    return {"ok": all(item["ok"] for item in checks), "repo": repo, "checks": checks}
+
+
 def github_remote_labels(repo: str, runner=None) -> dict:
     command = ["gh", "label", "list", "--repo", repo, "--json", "name", "--limit", "1000"]
     result = _run_gh(command, runner=runner)
@@ -162,6 +254,105 @@ def github_remote_labels(repo: str, runner=None) -> dict:
         }
     payload = json.loads(result.stdout or "[]")
     return {"ok": True, "repo": repo, "labels": sorted(item["name"] for item in payload), "command": command}
+
+
+def github_labels_create(path: str = ".", repo: str = "", apply: bool = False, runner=None) -> dict:
+    repo = _resolve_repo(path, repo)
+    if not repo:
+        return {"ok": False, "status": "missing-repo", "message": "--repo or github_config repo is required."}
+    root = _ensure_network(path)
+    issues = _load_items(root / "issues")
+    desired = _labels_from_issues(issues)
+    remote = github_remote_labels(repo, runner=runner)
+    if not remote["ok"]:
+        return {"ok": False, "status": "remote-labels-failed", "message": remote.get("error", ""), "results": []}
+    remote_names = set(remote["labels"])
+    missing = [label for label in desired if label["name"] not in remote_names]
+    results = []
+    for label in missing:
+        command = [
+            "gh",
+            "label",
+            "create",
+            label["name"],
+            "--repo",
+            repo,
+            "--color",
+            label["color"],
+            "--description",
+            label["description"],
+        ]
+        if not apply:
+            results.append({"ok": True, "status": "dry-run", "label": label["name"], "command": command})
+            continue
+        result = _run_gh(command, runner=runner)
+        results.append(
+            {
+                "ok": result.returncode == 0,
+                "status": "created" if result.returncode == 0 else "failed",
+                "label": label["name"],
+                "command": command,
+                "stderr": result.stderr,
+            }
+        )
+    failures = [item for item in results if not item["ok"]]
+    _append_log(root, "github_labels_create", {"repo": repo, "apply": apply, "missing": len(missing), "failed": len(failures)})
+    return {
+        "ok": not failures,
+        "status": "created" if apply else "dry-run",
+        "repo": repo,
+        "missing": len(missing),
+        "created": len([item for item in results if item["status"] == "created"]),
+        "results": results,
+    }
+
+
+def github_milestones_create(path: str = ".", repo: str = "", apply: bool = False, runner=None) -> dict:
+    repo = _resolve_repo(path, repo)
+    if not repo:
+        return {"ok": False, "status": "missing-repo", "message": "--repo or github_config repo is required."}
+    root = _ensure_network(path)
+    ensure_remote_metadata(path)
+    milestones = _load_items(root / "milestones")
+    results = []
+    for milestone in milestones:
+        if milestone.get("remote", {}).get("url") or milestone.get("remote", {}).get("number"):
+            results.append({"ok": True, "status": "skipped", "id": milestone["id"], "reason": "already-linked"})
+            continue
+        command = [
+            "gh",
+            "api",
+            f"repos/{repo}/milestones",
+            "-f",
+            f"title={milestone.get('title', 'Untitled milestone')}",
+            "-f",
+            f"description={milestone.get('description', '')}",
+        ]
+        if milestone.get("due"):
+            command.extend(["-f", f"due_on={milestone['due']}T00:00:00Z"])
+        if not apply:
+            results.append({"ok": True, "status": "dry-run", "id": milestone["id"], "command": command})
+            continue
+        result = _run_gh(command, runner=runner)
+        if result.returncode != 0:
+            results.append({"ok": False, "status": "failed", "id": milestone["id"], "command": command, "stderr": result.stderr})
+            continue
+        payload = json.loads(result.stdout or "{}")
+        item_path = Path(milestone["_path"])
+        stored = json.loads(item_path.read_text(encoding="utf-8"))
+        stored["remote"] = {
+            "provider": "github",
+            "repo": repo,
+            "number": payload.get("number"),
+            "url": payload.get("html_url"),
+            "synced_at": _now(),
+        }
+        stored["updated_at"] = _now()
+        _write_json(item_path, stored)
+        results.append({"ok": True, "status": "created", "id": milestone["id"], "url": payload.get("html_url"), "number": payload.get("number")})
+    failures = [item for item in results if not item["ok"]]
+    _append_log(root, "github_milestones_create", {"repo": repo, "apply": apply, "failed": len(failures)})
+    return {"ok": not failures, "status": "created" if apply else "dry-run", "repo": repo, "results": results}
 
 
 def _issue_create_command(repo: str, issue: dict, labels: list[str] | None = None) -> list[str]:
@@ -189,8 +380,9 @@ def github_issue_create(
     skip_missing_labels: bool = False,
     runner=None,
 ) -> dict:
+    repo = _resolve_repo(path, repo)
     if not repo:
-        return {"ok": False, "status": "missing-repo", "message": "--repo is required."}
+        return {"ok": False, "status": "missing-repo", "message": "--repo or github_config repo is required."}
 
     root = _ensure_network(path)
     ensure_remote_metadata(path)
@@ -273,8 +465,9 @@ def github_issues_create(
     skip_missing_labels: bool = False,
     runner=None,
 ) -> dict:
+    repo = _resolve_repo(path, repo)
     if not repo:
-        return {"ok": False, "status": "missing-repo", "message": "--repo is required.", "results": []}
+        return {"ok": False, "status": "missing-repo", "message": "--repo or github_config repo is required.", "results": []}
     root = _ensure_network(path)
     ensure_remote_metadata(path)
     issues = _load_items(root / "issues")
@@ -308,6 +501,123 @@ def github_issues_create(
         "dry_run": len(dry_runs),
         "failed": len(failures),
         "results": results,
+    }
+
+
+def _remote_issue_payload(repo: str, number: int, runner=None) -> dict:
+    command = [
+        "gh",
+        "issue",
+        "view",
+        str(number),
+        "--repo",
+        repo,
+        "--json",
+        "number,state,title,url,labels,assignees,milestone",
+    ]
+    ok, payload, error = _gh_json(command, runner=runner)
+    return {"ok": ok, "payload": payload, "error": error, "command": command}
+
+
+def _local_status_from_remote(state: str) -> str:
+    return "closed" if state.upper() == "CLOSED" else "open"
+
+
+def _classify_remote_state(local: dict, remote_payload: dict | None, remote_ok: bool) -> str:
+    if not local.get("remote", {}).get("number"):
+        return "local-only"
+    if not remote_ok or not remote_payload:
+        return "missing-remote"
+    remote_status = _local_status_from_remote(remote_payload.get("state", "OPEN"))
+    if local.get("title") != remote_payload.get("title") or local.get("status", "open") != remote_status:
+        return "remote-changed"
+    return "synced"
+
+
+def github_pull(path: str = ".", repo: str = "", runner=None) -> dict:
+    repo = _resolve_repo(path, repo)
+    if not repo:
+        return {"ok": False, "status": "missing-repo", "message": "--repo or github_config repo is required.", "results": []}
+    root = _ensure_network(path)
+    ensure_remote_metadata(path)
+    results = []
+    for issue_path in sorted((root / "issues").glob("*.json")):
+        local = json.loads(issue_path.read_text(encoding="utf-8"))
+        remote = local.get("remote") or {}
+        number = remote.get("number")
+        if not number:
+            local["worknet_status"] = "local-only"
+            local["updated_at"] = _now()
+            _write_json(issue_path, local)
+            results.append({"ok": True, "id": local["id"], "status": "local-only"})
+            continue
+        fetched = _remote_issue_payload(remote.get("repo") or repo, int(number), runner=runner)
+        status = _classify_remote_state(local, fetched.get("payload"), fetched["ok"])
+        local["remote_state"] = fetched.get("payload") if fetched["ok"] else {"error": fetched.get("error")}
+        local["worknet_status"] = status
+        local["updated_at"] = _now()
+        _write_json(issue_path, local)
+        results.append({"ok": fetched["ok"], "id": local["id"], "status": status, "number": number})
+    failures = [item for item in results if not item["ok"]]
+    _append_log(root, "github_pull", {"repo": repo, "issues": len(results), "failed": len(failures)})
+    return {"ok": not failures, "status": "pulled", "repo": repo, "results": results}
+
+
+def github_sync_report(
+    path: str = ".",
+    repo: str = "",
+    output: str = str(GITHUB_SYNC_REPORT),
+) -> dict:
+    repo = _resolve_repo(path, repo)
+    root = _ensure_network(path)
+    ensure_remote_metadata(path)
+    issues = _load_items(root / "issues")
+    milestones = _load_items(root / "milestones")
+    prs = _load_items(root / "prs")
+    groups = {"synced": [], "remote-changed": [], "missing-remote": [], "local-only": [], "unclassified": []}
+    for issue in issues:
+        status = issue.get("worknet_status") or ("synced" if issue.get("remote", {}).get("url") else "local-only")
+        groups.setdefault(status, groups["unclassified"]).append(issue)
+
+    chunks = [
+        "# Agent GitHub Worknet Sync Report",
+        "",
+        f"Generated: {_now()}",
+        f"Repo: {repo or 'Not configured'}",
+        "",
+        "## Summary",
+        "",
+        f"- Issues: {len(issues)}",
+        f"- Synced issues: {len(groups['synced'])}",
+        f"- Remote-changed issues: {len(groups['remote-changed'])}",
+        f"- Missing remote issues: {len(groups['missing-remote'])}",
+        f"- Local-only issues: {len(groups['local-only'])}",
+        f"- Milestones: {len(milestones)}",
+        f"- PR records: {len(prs)}",
+        "",
+    ]
+    for group_name in ["synced", "remote-changed", "missing-remote", "local-only"]:
+        title = group_name.replace("-", " ").title()
+        chunks.extend([f"## {title}", ""])
+        for item in groups[group_name]:
+            remote = item.get("remote", {})
+            suffix = f" -> {remote.get('url')}" if remote.get("url") else ""
+            chunks.append(f"- {item['id']}: {item.get('title', '')}{suffix}")
+        if not groups[group_name]:
+            chunks.append("- None.")
+        chunks.append("")
+    output_path = Path(path) / output
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text("\n".join(chunks).rstrip() + "\n", encoding="utf-8")
+    _append_log(root, "github_sync_report", {"repo": repo, "output": str(output_path), "issues": len(issues)})
+    return {
+        "output": str(output_path),
+        "repo": repo,
+        "issues": len(issues),
+        "synced": len(groups["synced"]),
+        "remote_changed": len(groups["remote-changed"]),
+        "missing_remote": len(groups["missing-remote"]),
+        "local_only": len(groups["local-only"]),
     }
 
 
@@ -395,6 +705,7 @@ def build_github_sync_plan(
 
 
 def github_sync(path: str = ".", dry_run: bool = True, repo: str = "", skip_missing_labels: bool = False, runner=None) -> dict:
+    repo = _resolve_repo(path, repo)
     labels = export_github_labels(path)
     issues = export_github_issues(path)
     milestones = export_github_milestones(path)
@@ -407,15 +718,20 @@ def github_sync(path: str = ".", dry_run: bool = True, repo: str = "", skip_miss
             skip_missing_labels=skip_missing_labels,
             runner=runner,
         )
+        pull = github_pull(path, repo=repo, runner=runner) if created["ok"] else {"ok": False, "status": "skipped"}
+        report = github_sync_report(path, repo=repo)
         return {
-            "ok": created["ok"],
+            "ok": created["ok"] and pull["ok"],
             "status": "created" if created["ok"] else "failed",
             "labels": labels,
             "issues": issues,
             "milestones": milestones,
             "plan": plan,
             "issue_create": created,
+            "pull": pull,
+            "report": report,
         }
+    report = github_sync_report(path, repo=repo)
     return {
         "ok": True,
         "status": "dry-run",
@@ -423,4 +739,5 @@ def github_sync(path: str = ".", dry_run: bool = True, repo: str = "", skip_miss
         "issues": issues,
         "milestones": milestones,
         "plan": plan,
+        "report": report,
     }

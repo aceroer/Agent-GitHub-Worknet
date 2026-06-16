@@ -102,6 +102,12 @@ structure-rule github-sync --dry-run
 structure-rule github-issue-create issue-0001 --repo owner/name
 structure-rule github-issue-create issue-0001 --repo owner/name --apply
 structure-rule github-issues-create --repo owner/name --apply
+structure-rule github-config --repo owner/name
+structure-rule github-doctor
+structure-rule github-labels-create --apply
+structure-rule github-milestones-create --apply
+structure-rule github-pull
+structure-rule github-sync-report
 ```
 
 These commands do not prescribe how a project must be organized beyond the
@@ -190,6 +196,16 @@ Version 0.9 adds real GitHub issue creation through the GitHub CLI:
 - successful creates write `repo`, `number`, `url`, and `synced_at` into local `remote` metadata
 - existing remote links are skipped to avoid duplicate issues
 - missing remote labels are reported before creation unless `--skip-missing-labels` is used
+
+Version 1.0 closes the first Agent GitHub Worknet loop:
+
+- `github-config` stores the default GitHub repository
+- `github-doctor` checks `gh`, auth, repo, issue, label, and milestone access
+- `github-labels-create` creates missing labels explicitly
+- `github-milestones-create` creates missing milestones explicitly
+- `github-pull` pulls linked GitHub issue state back into local records
+- `github-sync-report` writes a local closure report
+- `github-sync --apply` creates issues, pulls remote state, and writes the report
 
 ## Agent Toolbox
 
@@ -426,6 +442,31 @@ created, Structure Rule Kit stores the GitHub issue URL and number back into the
 local issue's `remote` field. If the local issue has labels that do not exist on
 the remote repository, creation is blocked with a missing-label report unless
 `--skip-missing-labels` is passed.
+
+## Agent GitHub Worknet
+
+1.0 promotes the GitHub bridge into Agent GitHub Worknet: a local-first GitHub
+work network for AI agents.
+
+```bash
+structure-rule github-config --repo owner/name
+structure-rule github-doctor
+structure-rule github-labels-create --apply
+structure-rule github-milestones-create --apply
+structure-rule github-issues-create --apply
+structure-rule github-pull
+structure-rule github-sync-report
+```
+
+The closure loop is:
+
+```text
+local issue -> GitHub issue -> remote state -> local status -> sync report
+```
+
+Local issue records can now carry `worknet_status` and `remote_state` fields
+after pullback. The sync report is written to
+`structure/network/github_export/sync_report.md`.
 
 ## Experimental Closure Layer
 

@@ -178,6 +178,17 @@ Add real GitHub issue creation through `gh`:
 - duplicate protection for already-linked issues
 - missing-label checks before remote creation
 
+## Version 1.0
+
+Close the first Agent GitHub Worknet loop:
+
+- GitHub repo config
+- GitHub environment doctor
+- explicit label and milestone creation
+- remote issue state pullback
+- local worknet status classification
+- sync report generation
+
 ## Deferred Ideas
 
 - Optional project presets, only if they support the scriptable integration layer.

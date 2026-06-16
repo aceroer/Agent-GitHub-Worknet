@@ -30,9 +30,15 @@ from .github_bridge import (
     export_github_issues,
     export_github_labels,
     export_github_milestones,
+    github_doctor,
     github_issue_create,
     github_issues_create,
+    github_labels_create,
+    github_milestones_create,
+    github_pull,
     github_sync,
+    github_sync_report,
+    write_github_config,
 )
 from .handoff import build_handoff_pack
 from .mcp_manifest import build_mcp_manifest
@@ -421,15 +427,45 @@ def main(argv: list[str] | None = None) -> int:
     github_issue_create_parser = subparsers.add_parser("github-issue-create", help="Create one local issue on GitHub")
     github_issue_create_parser.add_argument("issue")
     github_issue_create_parser.add_argument("--path", default=".")
-    github_issue_create_parser.add_argument("--repo", required=True)
+    github_issue_create_parser.add_argument("--repo", default="")
     github_issue_create_parser.add_argument("--apply", action="store_true")
     github_issue_create_parser.add_argument("--skip-missing-labels", action="store_true")
 
     github_issues_create_parser = subparsers.add_parser("github-issues-create", help="Create local issues on GitHub")
     github_issues_create_parser.add_argument("--path", default=".")
-    github_issues_create_parser.add_argument("--repo", required=True)
+    github_issues_create_parser.add_argument("--repo", default="")
     github_issues_create_parser.add_argument("--apply", action="store_true")
     github_issues_create_parser.add_argument("--skip-missing-labels", action="store_true")
+
+    github_config_parser = subparsers.add_parser("github-config", help="Write Agent GitHub Worknet config")
+    github_config_parser.add_argument("--path", default=".")
+    github_config_parser.add_argument("--repo", default="")
+    github_config_parser.add_argument("--output", default="structure/network/github_config.json")
+    github_config_parser.add_argument("--force", action="store_true")
+
+    github_doctor_parser = subparsers.add_parser("github-doctor", help="Check GitHub CLI and repo access")
+    github_doctor_parser.add_argument("--path", default=".")
+    github_doctor_parser.add_argument("--repo", default="")
+    github_doctor_parser.add_argument("--json", action="store_true")
+
+    github_labels_create_parser = subparsers.add_parser("github-labels-create", help="Create missing GitHub labels")
+    github_labels_create_parser.add_argument("--path", default=".")
+    github_labels_create_parser.add_argument("--repo", default="")
+    github_labels_create_parser.add_argument("--apply", action="store_true")
+
+    github_milestones_create_parser = subparsers.add_parser("github-milestones-create", help="Create missing GitHub milestones")
+    github_milestones_create_parser.add_argument("--path", default=".")
+    github_milestones_create_parser.add_argument("--repo", default="")
+    github_milestones_create_parser.add_argument("--apply", action="store_true")
+
+    github_pull_parser = subparsers.add_parser("github-pull", help="Pull linked GitHub issue state into local records")
+    github_pull_parser.add_argument("--path", default=".")
+    github_pull_parser.add_argument("--repo", default="")
+
+    github_sync_report_parser = subparsers.add_parser("github-sync-report", help="Write Agent GitHub Worknet sync report")
+    github_sync_report_parser.add_argument("--path", default=".")
+    github_sync_report_parser.add_argument("--repo", default="")
+    github_sync_report_parser.add_argument("--output", default="structure/network/github_export/sync_report.md")
 
     args = parser.parse_args(argv)
 
@@ -959,6 +995,50 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         print(f"GitHub issues: {report['status']}")
         print(f"Created: {report['created']}; skipped: {report['skipped']}; dry-run: {report['dry_run']}")
+        return 0
+
+    if args.command == "github-config":
+        report = write_github_config(args.path, repo=args.repo, output=args.output, force=args.force)
+        print(f"{'Wrote' if report['created'] else 'Exists'} {Path(report['output'])}")
+        return 0
+
+    if args.command == "github-doctor":
+        report = github_doctor(args.path, repo=args.repo)
+        if args.json:
+            print(json.dumps(report, indent=2))
+        else:
+            print("OK" if report["ok"] else "FAILED")
+            for check in report["checks"]:
+                print(f"- {check['name']}: {'ok' if check['ok'] else 'failed'}")
+        return 0 if report["ok"] else 1
+
+    if args.command == "github-labels-create":
+        report = github_labels_create(args.path, repo=args.repo, apply=args.apply)
+        if not report["ok"]:
+            print(report.get("message") or "GitHub labels create failed.")
+            return 1
+        print(f"GitHub labels: {report['status']}; missing: {report['missing']}; created: {report['created']}")
+        return 0
+
+    if args.command == "github-milestones-create":
+        report = github_milestones_create(args.path, repo=args.repo, apply=args.apply)
+        if not report["ok"]:
+            print("GitHub milestones create failed.")
+            return 1
+        print(f"GitHub milestones: {report['status']}")
+        return 0
+
+    if args.command == "github-pull":
+        report = github_pull(args.path, repo=args.repo)
+        if not report["ok"]:
+            print(report.get("message") or "GitHub pull failed.")
+            return 1
+        print(f"GitHub pull: {len(report['results'])} issues")
+        return 0
+
+    if args.command == "github-sync-report":
+        report = github_sync_report(args.path, repo=args.repo, output=args.output)
+        print(f"Wrote {Path(report['output'])}")
         return 0
 
     parser.error("Unknown command")

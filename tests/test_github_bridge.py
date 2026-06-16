@@ -11,10 +11,17 @@ from structure_rule_kit import (
     export_github_issues,
     export_github_labels,
     export_github_milestones,
+    github_doctor,
     github_issue_create,
     github_issues_create,
+    github_labels_create,
+    github_milestones_create,
+    github_pull,
     github_sync,
+    github_sync_report,
     init_structure,
+    load_github_config,
+    write_github_config,
 )
 from structure_rule_kit.cli import main
 
@@ -99,8 +106,33 @@ def mock_gh(labels=None, issue_url="https://github.com/aceroer/example/issues/17
         if command[:3] == ["gh", "label", "list"]:
             payload = [{"name": label} for label in labels]
             return subprocess.CompletedProcess(command, 0, stdout=json.dumps(payload), stderr="")
+        if command[:3] == ["gh", "label", "create"]:
+            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
         if command[:3] == ["gh", "issue", "create"]:
             return subprocess.CompletedProcess(command, 0, stdout=f"{issue_url}\n", stderr="")
+        if command[:3] == ["gh", "issue", "view"]:
+            payload = {
+                "number": int(command[3]),
+                "state": "OPEN",
+                "title": "Bridge issue",
+                "url": f"https://github.com/aceroer/example/issues/{command[3]}",
+                "labels": [{"name": "agent"}, {"name": "github"}],
+                "assignees": [],
+                "milestone": None,
+            }
+            return subprocess.CompletedProcess(command, 0, stdout=json.dumps(payload), stderr="")
+        if command[:2] == ["gh", "api"] and command[2].endswith("/milestones"):
+            payload = {"number": 3, "html_url": "https://github.com/aceroer/example/milestone/3"}
+            return subprocess.CompletedProcess(command, 0, stdout=json.dumps(payload), stderr="")
+        if command[:2] == ["gh", "auth"]:
+            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+        if command[:3] == ["gh", "repo", "view"]:
+            payload = {"name": "example", "owner": {"login": "aceroer"}, "visibility": "PUBLIC", "url": "https://github.com/aceroer/example"}
+            return subprocess.CompletedProcess(command, 0, stdout=json.dumps(payload), stderr="")
+        if command[:3] == ["gh", "issue", "list"]:
+            return subprocess.CompletedProcess(command, 0, stdout="[]", stderr="")
+        if command[:2] == ["gh", "api"] and "milestones?state=all" in command[2]:
+            return subprocess.CompletedProcess(command, 0, stdout="[]", stderr="")
         return subprocess.CompletedProcess(command, 1, stdout="", stderr="unexpected command")
 
     runner.calls = calls
@@ -156,3 +188,59 @@ def test_github_issues_create_batch_and_sync_apply(tmp_path):
     assert report["created"] == 2
     assert sync["ok"] is True
     assert sync["issue_create"]["skipped"] == 2
+
+
+def test_github_config_and_repo_resolution(tmp_path):
+    seed_network(tmp_path)
+    config = write_github_config(str(tmp_path), repo="aceroer/example")
+    loaded = load_github_config(str(tmp_path))
+    report = github_issue_create(str(tmp_path), issue="issue-0001", runner=mock_gh())
+
+    assert config["created"] is True
+    assert loaded["repo"] == "aceroer/example"
+    assert report["repo"] == "aceroer/example"
+
+
+def test_github_labels_and_milestones_create(tmp_path):
+    seed_network(tmp_path)
+    labels = github_labels_create(str(tmp_path), repo="aceroer/example", apply=True, runner=mock_gh(labels=[]))
+    milestones = github_milestones_create(str(tmp_path), repo="aceroer/example", apply=True, runner=mock_gh())
+
+    assert labels["ok"] is True
+    assert labels["created"] == 2
+    assert milestones["ok"] is True
+    assert milestones["results"][0]["status"] == "created"
+
+
+def test_github_pull_and_sync_report(tmp_path):
+    seed_network(tmp_path)
+    github_issue_create(
+        str(tmp_path),
+        issue="issue-0001",
+        repo="aceroer/example",
+        apply=True,
+        runner=mock_gh(issue_url="https://github.com/aceroer/example/issues/42"),
+    )
+    pull = github_pull(str(tmp_path), repo="aceroer/example", runner=mock_gh())
+    report = github_sync_report(str(tmp_path), repo="aceroer/example")
+    text = Path(report["output"]).read_text(encoding="utf-8")
+
+    assert pull["ok"] is True
+    assert any(item["status"] == "synced" for item in pull["results"])
+    assert report["synced"] == 1
+    assert "Agent GitHub Worknet Sync Report" in text
+
+
+def test_github_doctor_with_runner(tmp_path, monkeypatch):
+    monkeypatch.setattr("structure_rule_kit.github_bridge.shutil.which", lambda name: "/usr/bin/gh")
+    report = github_doctor(str(tmp_path), repo="aceroer/example", runner=mock_gh())
+
+    assert report["ok"] is True
+    assert len(report["checks"]) == 6
+
+
+def test_github_closure_cli_commands(tmp_path, monkeypatch):
+    seed_network(tmp_path)
+    monkeypatch.setattr("structure_rule_kit.github_bridge.shutil.which", lambda name: "/usr/bin/gh")
+    assert main(["github-config", "--path", str(tmp_path), "--repo", "aceroer/example"]) == 0
+    assert main(["github-sync-report", "--path", str(tmp_path)]) == 0
