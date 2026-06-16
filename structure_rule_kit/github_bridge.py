@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import re
+import subprocess
 from pathlib import Path
 
-from .network import _append_log, _ensure_network, _load_items, _now, _write_json
+from .network import _append_log, _ensure_network, _find_item, _load_items, _now, _write_json
 
 
 def _remote_stub() -> dict:
@@ -124,6 +126,191 @@ def _linked(items: list[dict]) -> list[dict]:
     return [item for item in items if item.get("remote", {}).get("url") or item.get("remote", {}).get("number")]
 
 
+def _issue_body(issue: dict) -> str:
+    body = issue.get("body") or "Not specified."
+    linked_snapshot = issue.get("linked_snapshot") or "None"
+    return f"""{body}
+
+---
+Local Structure Rule Kit issue: {issue.get('id')}
+Linked snapshot: {linked_snapshot}
+"""
+
+
+def _parse_issue_number(url: str) -> int | None:
+    match = re.search(r"/issues/(\d+)(?:\D*)?$", url.strip())
+    if not match:
+        return None
+    return int(match.group(1))
+
+
+def _run_gh(command: list[str], runner=None) -> subprocess.CompletedProcess:
+    run = runner or subprocess.run
+    return run(command, capture_output=True, text=True)
+
+
+def github_remote_labels(repo: str, runner=None) -> dict:
+    command = ["gh", "label", "list", "--repo", repo, "--json", "name", "--limit", "1000"]
+    result = _run_gh(command, runner=runner)
+    if result.returncode != 0:
+        return {
+            "ok": False,
+            "repo": repo,
+            "labels": [],
+            "error": (result.stderr or result.stdout).strip(),
+            "command": command,
+        }
+    payload = json.loads(result.stdout or "[]")
+    return {"ok": True, "repo": repo, "labels": sorted(item["name"] for item in payload), "command": command}
+
+
+def _issue_create_command(repo: str, issue: dict, labels: list[str] | None = None) -> list[str]:
+    command = [
+        "gh",
+        "issue",
+        "create",
+        "--repo",
+        repo,
+        "--title",
+        issue.get("title") or "Untitled issue",
+        "--body",
+        _issue_body(issue),
+    ]
+    for label in labels or []:
+        command.extend(["--label", label])
+    return command
+
+
+def github_issue_create(
+    path: str = ".",
+    issue: str = "",
+    repo: str = "",
+    apply: bool = False,
+    skip_missing_labels: bool = False,
+    runner=None,
+) -> dict:
+    if not repo:
+        return {"ok": False, "status": "missing-repo", "message": "--repo is required."}
+
+    root = _ensure_network(path)
+    ensure_remote_metadata(path)
+    issue_path, payload = _find_item(root, "issues", issue)
+    _ensure_remote(payload)
+    remote = payload["remote"]
+    if remote.get("url") or remote.get("number"):
+        return {
+            "ok": True,
+            "status": "skipped",
+            "reason": "already-linked",
+            "id": issue,
+            "remote": remote,
+        }
+
+    labels = list(payload.get("labels", []))
+    remote_label_report = github_remote_labels(repo, runner=runner) if labels else {"ok": True, "labels": []}
+    missing_labels = []
+    if labels and remote_label_report["ok"]:
+        remote_labels = set(remote_label_report["labels"])
+        missing_labels = [label for label in labels if label not in remote_labels]
+    if labels and not remote_label_report["ok"]:
+        missing_labels = labels
+
+    selected_labels = [label for label in labels if label not in missing_labels] if skip_missing_labels else labels
+    command = _issue_create_command(repo, payload, selected_labels)
+
+    if missing_labels and not skip_missing_labels:
+        return {
+            "ok": False,
+            "status": "missing-labels",
+            "id": issue,
+            "repo": repo,
+            "missing_labels": missing_labels,
+            "command": command,
+            "message": "Remote labels are missing. Create them first or use --skip-missing-labels.",
+        }
+
+    if not apply:
+        return {
+            "ok": True,
+            "status": "dry-run",
+            "id": issue,
+            "repo": repo,
+            "missing_labels": missing_labels,
+            "command": command,
+        }
+
+    result = _run_gh(command, runner=runner)
+    if result.returncode != 0:
+        return {
+            "ok": False,
+            "status": "failed",
+            "id": issue,
+            "repo": repo,
+            "command": command,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+        }
+
+    url = result.stdout.strip().splitlines()[-1].strip()
+    number = _parse_issue_number(url)
+    payload["remote"] = {
+        "provider": "github",
+        "repo": repo,
+        "number": number,
+        "url": url,
+        "synced_at": _now(),
+    }
+    payload["updated_at"] = _now()
+    _write_json(issue_path, payload)
+    _append_log(root, "github_issue_create", {"id": issue, "repo": repo, "url": url, "number": number})
+    return {"ok": True, "status": "created", "id": issue, "repo": repo, "url": url, "number": number}
+
+
+def github_issues_create(
+    path: str = ".",
+    repo: str = "",
+    apply: bool = False,
+    skip_missing_labels: bool = False,
+    runner=None,
+) -> dict:
+    if not repo:
+        return {"ok": False, "status": "missing-repo", "message": "--repo is required.", "results": []}
+    root = _ensure_network(path)
+    ensure_remote_metadata(path)
+    issues = _load_items(root / "issues")
+    results = []
+    for item in issues:
+        results.append(
+            github_issue_create(
+                path,
+                issue=item["id"],
+                repo=repo,
+                apply=apply,
+                skip_missing_labels=skip_missing_labels,
+                runner=runner,
+            )
+        )
+    failures = [item for item in results if not item.get("ok")]
+    created = [item for item in results if item.get("status") == "created"]
+    skipped = [item for item in results if item.get("status") == "skipped"]
+    dry_runs = [item for item in results if item.get("status") == "dry-run"]
+    _append_log(
+        root,
+        "github_issues_create",
+        {"repo": repo, "apply": apply, "created": len(created), "skipped": len(skipped), "failed": len(failures)},
+    )
+    return {
+        "ok": not failures,
+        "status": "created" if apply and created else "dry-run",
+        "repo": repo,
+        "created": len(created),
+        "skipped": len(skipped),
+        "dry_run": len(dry_runs),
+        "failed": len(failures),
+        "results": results,
+    }
+
+
 def build_github_sync_plan(
     path: str = ".",
     output: str = "structure/network/github_export/sync_plan.md",
@@ -207,13 +394,28 @@ def build_github_sync_plan(
     }
 
 
-def github_sync(path: str = ".", dry_run: bool = True) -> dict:
-    if not dry_run:
-        return {"ok": False, "status": "unsupported", "message": "Real GitHub sync is not implemented in 0.8."}
+def github_sync(path: str = ".", dry_run: bool = True, repo: str = "", skip_missing_labels: bool = False, runner=None) -> dict:
     labels = export_github_labels(path)
     issues = export_github_issues(path)
     milestones = export_github_milestones(path)
     plan = build_github_sync_plan(path)
+    if not dry_run:
+        created = github_issues_create(
+            path,
+            repo=repo,
+            apply=True,
+            skip_missing_labels=skip_missing_labels,
+            runner=runner,
+        )
+        return {
+            "ok": created["ok"],
+            "status": "created" if created["ok"] else "failed",
+            "labels": labels,
+            "issues": issues,
+            "milestones": milestones,
+            "plan": plan,
+            "issue_create": created,
+        }
     return {
         "ok": True,
         "status": "dry-run",

@@ -1,4 +1,5 @@
 import json
+import subprocess
 from pathlib import Path
 
 from structure_rule_kit import (
@@ -10,6 +11,8 @@ from structure_rule_kit import (
     export_github_issues,
     export_github_labels,
     export_github_milestones,
+    github_issue_create,
+    github_issues_create,
     github_sync,
     init_structure,
 )
@@ -84,3 +87,72 @@ def test_github_bridge_cli(tmp_path):
     assert main(["github-sync", "--path", str(tmp_path), "--apply"]) == 1
 
     assert (tmp_path / "structure" / "network" / "github_export" / "sync_plan.md").exists()
+
+
+def mock_gh(labels=None, issue_url="https://github.com/aceroer/example/issues/17"):
+    if labels is None:
+        labels = ["agent", "github"]
+    calls = []
+
+    def runner(command, capture_output=True, text=True):
+        calls.append(command)
+        if command[:3] == ["gh", "label", "list"]:
+            payload = [{"name": label} for label in labels]
+            return subprocess.CompletedProcess(command, 0, stdout=json.dumps(payload), stderr="")
+        if command[:3] == ["gh", "issue", "create"]:
+            return subprocess.CompletedProcess(command, 0, stdout=f"{issue_url}\n", stderr="")
+        return subprocess.CompletedProcess(command, 1, stdout="", stderr="unexpected command")
+
+    runner.calls = calls
+    return runner
+
+
+def test_github_issue_create_dry_run(tmp_path):
+    seed_network(tmp_path)
+    runner = mock_gh()
+    report = github_issue_create(str(tmp_path), issue="issue-0001", repo="aceroer/example", runner=runner)
+
+    assert report["status"] == "dry-run"
+    assert report["command"][:5] == ["gh", "issue", "create", "--repo", "aceroer/example"]
+    assert not any(call[:3] == ["gh", "issue", "create"] for call in runner.calls)
+
+
+def test_github_issue_create_missing_labels(tmp_path):
+    seed_network(tmp_path)
+    report = github_issue_create(str(tmp_path), issue="issue-0001", repo="aceroer/example", runner=mock_gh(labels=[]))
+
+    assert report["ok"] is False
+    assert report["status"] == "missing-labels"
+    assert report["missing_labels"] == ["agent", "github"]
+
+
+def test_github_issue_create_apply_updates_remote(tmp_path):
+    seed_network(tmp_path)
+    report = github_issue_create(
+        str(tmp_path),
+        issue="issue-0001",
+        repo="aceroer/example",
+        apply=True,
+        runner=mock_gh(issue_url="https://github.com/aceroer/example/issues/42"),
+    )
+    issue_path = next((tmp_path / "structure" / "network" / "issues").glob("issue-0001*.json"))
+    payload = json.loads(issue_path.read_text(encoding="utf-8"))
+
+    assert report["status"] == "created"
+    assert report["number"] == 42
+    assert payload["remote"]["repo"] == "aceroer/example"
+    assert payload["remote"]["number"] == 42
+    assert payload["remote"]["url"] == "https://github.com/aceroer/example/issues/42"
+    assert payload["remote"]["synced_at"]
+
+
+def test_github_issues_create_batch_and_sync_apply(tmp_path):
+    seed_network(tmp_path)
+    runner = mock_gh(issue_url="https://github.com/aceroer/example/issues/50")
+    report = github_issues_create(str(tmp_path), repo="aceroer/example", apply=True, runner=runner)
+    sync = github_sync(str(tmp_path), dry_run=False, repo="aceroer/example", runner=runner)
+
+    assert report["ok"] is True
+    assert report["created"] == 2
+    assert sync["ok"] is True
+    assert sync["issue_create"]["skipped"] == 2

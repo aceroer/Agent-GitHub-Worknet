@@ -44,6 +44,11 @@ lifecycle commands.
 Add a dry-run GitHub bridge for labels, issues, milestones, remote metadata, and
 sync-plan export without remote API writes.
 
+## Version 0.9
+
+Add explicit `gh issue create` support for single and batch issue creation, with
+remote metadata write-back and duplicate protection.
+
 ## Deferred Ideas
 
 - Optional presets, only if they support the integration tools.

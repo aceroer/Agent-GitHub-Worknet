@@ -99,6 +99,9 @@ structure-rule github-issues-export
 structure-rule github-milestones-export
 structure-rule github-dry-run
 structure-rule github-sync --dry-run
+structure-rule github-issue-create issue-0001 --repo owner/name
+structure-rule github-issue-create issue-0001 --repo owner/name --apply
+structure-rule github-issues-create --repo owner/name --apply
 ```
 
 These commands do not prescribe how a project must be organized beyond the
@@ -178,6 +181,15 @@ Version 0.8 adds a dry-run GitHub bridge layer:
 - milestone export to `github_export/milestones.json`
 - dry-run sync plan generation
 - `github-sync --dry-run` for a complete export pass without remote API calls
+
+Version 0.9 adds real GitHub issue creation through the GitHub CLI:
+
+- `github-issue-create issue-0001 --repo owner/name` builds a safe dry run
+- `github-issue-create issue-0001 --repo owner/name --apply` creates one remote issue
+- `github-issues-create --repo owner/name --apply` creates all unlinked local issues
+- successful creates write `repo`, `number`, `url`, and `synced_at` into local `remote` metadata
+- existing remote links are skipped to avoid duplicate issues
+- missing remote labels are reported before creation unless `--skip-missing-labels` is used
 
 ## Agent Toolbox
 
@@ -379,6 +391,9 @@ structure-rule github-issues-export
 structure-rule github-milestones-export
 structure-rule github-dry-run
 structure-rule github-sync --dry-run
+structure-rule github-issue-create issue-0001 --repo owner/name
+structure-rule github-issue-create issue-0001 --repo owner/name --apply
+structure-rule github-issues-create --repo owner/name --apply
 ```
 
 The bridge writes export files under `structure/network/github_export/` and
@@ -396,6 +411,21 @@ adds a `remote` metadata block to local issues, PRs, and milestones:
 
 `github-sync --dry-run` produces labels, issue markdown, milestone JSON, and a
 sync plan. It does not create or modify any remote GitHub resources.
+
+0.9 can create real GitHub issues when `gh` is installed and authenticated:
+
+```bash
+structure-rule github-issue-create issue-0001 --repo owner/name
+structure-rule github-issue-create issue-0001 --repo owner/name --apply
+structure-rule github-issues-create --repo owner/name --apply
+structure-rule github-sync --repo owner/name --apply
+```
+
+The default mode is still safe: no `--apply`, no remote write. When an issue is
+created, Structure Rule Kit stores the GitHub issue URL and number back into the
+local issue's `remote` field. If the local issue has labels that do not exist on
+the remote repository, creation is blocked with a missing-label report unless
+`--skip-missing-labels` is passed.
 
 ## Example Workflow
 

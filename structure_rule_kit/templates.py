@@ -168,6 +168,16 @@ Add a dry-run GitHub bridge layer:
 - dry-run sync plans
 - no remote API writes in this phase
 
+## Version 0.9
+
+Add real GitHub issue creation through `gh`:
+
+- single issue creation with explicit `--apply`
+- batch issue creation for unlinked local issues
+- remote URL and issue number write-back
+- duplicate protection for already-linked issues
+- missing-label checks before remote creation
+
 ## Deferred Ideas
 
 - Optional project presets, only if they support the scriptable integration layer.

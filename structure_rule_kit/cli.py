@@ -30,6 +30,8 @@ from .github_bridge import (
     export_github_issues,
     export_github_labels,
     export_github_milestones,
+    github_issue_create,
+    github_issues_create,
     github_sync,
 )
 from .handoff import build_handoff_pack
@@ -413,6 +415,21 @@ def main(argv: list[str] | None = None) -> int:
     github_sync_parser.add_argument("--path", default=".")
     github_sync_parser.add_argument("--dry-run", action="store_true", default=True)
     github_sync_parser.add_argument("--apply", action="store_true", help="Reserved for a future real API sync")
+    github_sync_parser.add_argument("--repo", default="")
+    github_sync_parser.add_argument("--skip-missing-labels", action="store_true")
+
+    github_issue_create_parser = subparsers.add_parser("github-issue-create", help="Create one local issue on GitHub")
+    github_issue_create_parser.add_argument("issue")
+    github_issue_create_parser.add_argument("--path", default=".")
+    github_issue_create_parser.add_argument("--repo", required=True)
+    github_issue_create_parser.add_argument("--apply", action="store_true")
+    github_issue_create_parser.add_argument("--skip-missing-labels", action="store_true")
+
+    github_issues_create_parser = subparsers.add_parser("github-issues-create", help="Create local issues on GitHub")
+    github_issues_create_parser.add_argument("--path", default=".")
+    github_issues_create_parser.add_argument("--repo", required=True)
+    github_issues_create_parser.add_argument("--apply", action="store_true")
+    github_issues_create_parser.add_argument("--skip-missing-labels", action="store_true")
 
     args = parser.parse_args(argv)
 
@@ -900,12 +917,48 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "github-sync":
-        report = github_sync(args.path, dry_run=not args.apply)
+        report = github_sync(
+            args.path,
+            dry_run=not args.apply,
+            repo=args.repo,
+            skip_missing_labels=args.skip_missing_labels,
+        )
         if not report["ok"]:
-            print(report["message"])
+            print(report.get("message") or "GitHub sync failed.")
             return 1
         print(f"GitHub bridge: {report['status']}")
         print(f"Plan: {Path(report['plan']['output'])}")
+        return 0
+
+    if args.command == "github-issue-create":
+        report = github_issue_create(
+            args.path,
+            issue=args.issue,
+            repo=args.repo,
+            apply=args.apply,
+            skip_missing_labels=args.skip_missing_labels,
+        )
+        if not report["ok"]:
+            print(report.get("message") or "GitHub issue create failed.")
+            return 1
+        print(f"{report['status']}: {report['id']}")
+        if report.get("url"):
+            print(report["url"])
+        return 0
+
+    if args.command == "github-issues-create":
+        report = github_issues_create(
+            args.path,
+            repo=args.repo,
+            apply=args.apply,
+            skip_missing_labels=args.skip_missing_labels,
+        )
+        if not report["ok"]:
+            print("GitHub issues create failed.")
+            print(f"Failed: {report['failed']}")
+            return 1
+        print(f"GitHub issues: {report['status']}")
+        print(f"Created: {report['created']}; skipped: {report['skipped']}; dry-run: {report['dry_run']}")
         return 0
 
     parser.error("Unknown command")

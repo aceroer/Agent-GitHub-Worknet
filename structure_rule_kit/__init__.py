@@ -26,6 +26,9 @@ from .github_bridge import (
     export_github_issues,
     export_github_labels,
     export_github_milestones,
+    github_issue_create,
+    github_issues_create,
+    github_remote_labels,
     github_sync,
 )
 from .handoff import build_handoff_pack
@@ -102,6 +105,9 @@ __all__ = [
     "export_github_milestones",
     "export_skill",
     "github_export",
+    "github_issue_create",
+    "github_issues_create",
+    "github_remote_labels",
     "github_sync",
     "init_context",
     "init_network",
