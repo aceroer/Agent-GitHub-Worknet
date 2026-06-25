@@ -125,6 +125,16 @@ Add a roundtable meeting layer:
 - organization applications
 - P12/P13 organization review gate
 
+## Version 1.4.4
+
+Stabilize protocols and operating flows:
+
+- fixed object protocol for issues, tasks, streams, meetings, votes, and applications
+- fixed authority protocol for governance, P-levels, executives, and human takeover
+- fixed workflow protocol from issue intake to verification and publication
+- fixed roundtable protocol for meeting minutes, weighted votes, and organization review
+- fixed handoff and audit protocol for agent continuity
+
 ## Deferred Ideas
 
 - Optional presets, only if they support the integration tools.

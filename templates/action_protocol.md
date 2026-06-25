@@ -14,6 +14,7 @@
 
 - Run relevant checks.
 - Update status if the task meaningfully changes project state.
+- Update `structure/protocols.md` if a workflow, authority rule, or data contract changes.
 
 ## When Unsure
 

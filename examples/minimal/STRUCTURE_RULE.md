@@ -9,10 +9,11 @@ Before editing code, read these files in order:
 3. `structure/roadmap.md`
 4. `structure/important_files.md`
 5. `structure/action_protocol.md`
-6. `structure/metrics.md`
-7. `structure/toolbox.md`
-8. `structure/status.md`
-9. `structure/agent_notes.md`
+6. `structure/protocols.md`
+7. `structure/metrics.md`
+8. `structure/toolbox.md`
+9. `structure/status.md`
+10. `structure/agent_notes.md`
 
 ## Agent Rule
 
@@ -22,6 +23,7 @@ Do not start editing before understanding:
 - the current roadmap stage
 - important files
 - forbidden actions
+- active protocols
 - completion metrics
 
 ## Update Rule

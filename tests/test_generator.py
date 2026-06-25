@@ -6,6 +6,7 @@ def test_init_structure_creates_files(tmp_path):
     assert report["created"]
     assert (tmp_path / "STRUCTURE_RULE.md").exists()
     assert (tmp_path / "structure" / "project_plan.md").exists()
+    assert (tmp_path / "structure" / "protocols.md").exists()
     assert (tmp_path / "structure" / "agent_notes.md").exists()
 
 

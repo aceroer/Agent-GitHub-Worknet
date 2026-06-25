@@ -50,6 +50,12 @@ The 1.4 runtime loop is stream-structured rather than tree-structured:
 issue -> stream -> CEO plan -> assignment -> stream events -> human takeover when needed
 ```
 
+The 1.4.4 protocol layer fixes the operating contracts:
+
+```text
+object protocol -> authority protocol -> workflow protocol -> roundtable protocol -> handoff protocol
+```
+
 ## Install
 
 ```bash
@@ -76,6 +82,10 @@ Create a structured project:
 structure-rule init
 structure-rule validate
 ```
+
+New projects include `structure/protocols.md`, the fixed contract file for
+object IDs, authority, workflow, roundtable decisions, GitHub sync, metrics, and
+handoffs.
 
 Create local work objects:
 
@@ -706,6 +716,35 @@ structure-rule roundtable-status
 
 `org-review` requires a P12 CEO agent or P13 human supervisor.
 
+### 1.4.4 Protocol Stabilization Layer
+
+The 1.4.4 patch fixes the protocols that were implicit across earlier versions.
+The main project-level contract now lives in:
+
+```text
+structure/protocols.md
+```
+
+The protocol file covers:
+
+- object protocol for issues, tasks, branches, PRs, streams, meetings, votes,
+  applications, and metrics
+- authority protocol for human owners, P13 supervisors, P12 CEO agents,
+  executive offices, and lower P-level agents
+- workflow protocol from intake to route, delegation, execution, verification,
+  review, and closure
+- roundtable protocol for minutes, weighted votes, and organization review
+- model API protocol for dry-runs, request packets, capability tokens, and
+  response records
+- GitHub protocol for local-first records, explicit `--apply`, remote pullback,
+  and sync reports
+- metrics protocol for evidence-backed agent behavior signals
+- handoff protocol for resumable agent continuity
+
+`STRUCTURE_RULE.md` now lists `structure/protocols.md` as a required read before
+metrics and toolbox files. `action_protocol.md` also requires protocol updates
+when a workflow, authority rule, or data contract changes.
+
 ## Local Network Model
 
 Agent GitHub Worknet stores local collaboration objects under:
@@ -747,6 +786,8 @@ Model-agent actions also pass through governance checks:
 - agent metrics are evidence-backed stream records, not hidden model judgments
 - roundtable organization reviews require a P12 CEO agent or P13 human supervisor
 - weighted votes use explicit weights or actor P-level authority
+- project protocols are fixed in `structure/protocols.md` and must be updated
+  when workflow, authority, or data contracts change
 
 Duplicate protection is built in:
 
@@ -802,12 +843,12 @@ the path toward the 1.0 closure release.
 Current stable version:
 
 ```text
-1.4.3
+1.4.4
 ```
 
-The 1.4.3 release adds roundtable meetings: append-only meeting terminals,
-meeting minutes generation, weighted voting, organization applications, and
-P12/P13 review gates.
+The 1.4.4 release stabilizes project protocols: object contracts, authority
+rules, workflow flow, roundtable decisions, model API gates, GitHub sync,
+metrics, and handoff continuity.
 
 ## Philosophy
 
