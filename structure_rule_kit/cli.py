@@ -49,13 +49,15 @@ from .governance import (
     governance_status,
     policy_show,
     sandbox_check,
+    secret_scan,
     subagent_create,
     subagent_plan,
+    token_revoke,
 )
 from .handoff import build_handoff_pack
 from .mcp_manifest import build_mcp_manifest
 from .mcp_scaffold import scaffold_mcp
-from .mcp_server import run_server
+from .mcp_server import run_http_server, run_server, run_stdio_server
 from .metrics import (
     metric_record,
     metric_show,
@@ -302,9 +304,13 @@ def main(argv: list[str] | None = None) -> int:
     sync_parser.add_argument("--skill-name", default="project-structure")
     sync_parser.add_argument("--budget", type=int, default=None)
 
-    mcp_server_parser = subparsers.add_parser("mcp-server", help="Run a minimal JSON MCP-like resource endpoint")
+    mcp_server_parser = subparsers.add_parser("mcp-server", help="Run the Agent GitHub Worknet MCP server")
     mcp_server_parser.add_argument("--path", default=".")
     mcp_server_parser.add_argument("--request", default="")
+    mcp_server_parser.add_argument("--stdio", action="store_true")
+    mcp_server_parser.add_argument("--http", action="store_true")
+    mcp_server_parser.add_argument("--host", default="127.0.0.1")
+    mcp_server_parser.add_argument("--port", type=int, default=8765)
 
     network_parser = subparsers.add_parser("network-init", help="Initialize local agent network folders")
     network_parser.add_argument("--path", default=".")
@@ -598,6 +604,13 @@ def main(argv: list[str] | None = None) -> int:
     approval_grant_parser.add_argument("approval")
     approval_grant_parser.add_argument("--path", default=".")
     approval_grant_parser.add_argument("--granted-by", default="human")
+    approval_grant_parser.add_argument("--ttl-hours", type=int, default=24)
+
+    token_revoke_parser = subparsers.add_parser("token-revoke", help="Revoke a capability token")
+    token_revoke_parser.add_argument("token")
+    token_revoke_parser.add_argument("--path", default=".")
+    token_revoke_parser.add_argument("--revoked-by", default="human")
+    token_revoke_parser.add_argument("--reason", default="")
 
     sandbox_check_parser = subparsers.add_parser("sandbox-check", help="Check whether a subagent may write a path")
     sandbox_check_parser.add_argument("subagent")
@@ -611,6 +624,11 @@ def main(argv: list[str] | None = None) -> int:
     command_check_parser.add_argument("--permission", default="")
     command_check_parser.add_argument("--cmd", required=True)
     command_check_parser.add_argument("--json", action="store_true")
+
+    secret_scan_parser = subparsers.add_parser("secret-scan", help="Scan one file for common secret patterns")
+    secret_scan_parser.add_argument("--path", default=".")
+    secret_scan_parser.add_argument("--target", required=True)
+    secret_scan_parser.add_argument("--json", action="store_true")
 
     governance_status_parser = subparsers.add_parser("governance-status", help="Show model-agent governance status")
     governance_status_parser.add_argument("--path", default=".")
@@ -1113,6 +1131,12 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if report["ready"] else 1
 
     if args.command == "mcp-server":
+        if args.stdio:
+            run_stdio_server(args.path)
+            return 0
+        if args.http:
+            run_http_server(args.path, host=args.host, port=args.port)
+            return 0
         print(json.dumps(run_server(args.path, args.request), indent=2))
         return 0
 
@@ -1531,9 +1555,14 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "approval-grant":
-        report = approval_grant(args.path, approval=args.approval, granted_by=args.granted_by)
+        report = approval_grant(args.path, approval=args.approval, granted_by=args.granted_by, ttl_hours=args.ttl_hours)
         print(f"Granted {report['id']}")
         print(f"Token: {Path(report['token'])}")
+        return 0
+
+    if args.command == "token-revoke":
+        report = token_revoke(args.path, token=args.token, revoked_by=args.revoked_by, reason=args.reason)
+        print(f"Revoked {report['id']}: {Path(report['output'])}")
         return 0
 
     if args.command == "sandbox-check":
@@ -1550,6 +1579,14 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(report, indent=2))
         else:
             print(f"{report['status'].upper()}: {report['level']} command under {report['permission']}")
+        return 0 if report["ok"] else 1
+
+    if args.command == "secret-scan":
+        report = secret_scan(args.path, target_path=args.target)
+        if args.json:
+            print(json.dumps(report, indent=2))
+        else:
+            print(f"{'CLEAR' if report['ok'] else 'FINDINGS'}: {report['path']}")
         return 0 if report["ok"] else 1
 
     if args.command == "governance-status":

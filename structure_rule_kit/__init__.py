@@ -50,13 +50,17 @@ from .governance import (
     load_policy,
     policy_show,
     sandbox_check,
+    sanitize_environment,
+    secret_scan,
     subagent_create,
     subagent_plan,
+    token_is_active,
+    token_revoke,
 )
 from .handoff import build_handoff_pack
 from .mcp_manifest import build_mcp_manifest
 from .mcp_scaffold import scaffold_mcp
-from .mcp_server import list_resources, read_resource, run_server
+from .mcp_server import handle_jsonrpc, list_resources, read_resource, run_http_server, run_server, run_stdio_server
 from .metrics import (
     load_metric_definitions,
     metric_record,
@@ -206,6 +210,7 @@ __all__ = [
     "github_sync_report",
     "governance_init",
     "governance_status",
+    "handle_jsonrpc",
     "human_takeover",
     "init_context",
     "init_network",
@@ -250,11 +255,14 @@ __all__ = [
     "run_agent_task",
     "runtime_init",
     "runtime_status",
+    "run_http_server",
     "run_server",
+    "run_stdio_server",
     "route_context",
     "read_resource",
     "scan_repo_map",
     "sandbox_check",
+    "sanitize_environment",
     "scorecard_build",
     "scaffold_mcp",
     "scaffold_skill",
@@ -267,7 +275,10 @@ __all__ = [
     "sync_network",
     "subagent_create",
     "subagent_plan",
+    "secret_scan",
     "timeline",
+    "token_is_active",
+    "token_revoke",
     "task_from_issue",
     "end_session",
     "ensure_remote_metadata",

@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
+import re
 import shlex
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from .network import _ensure_network, _find_item, _next_id, _now, _slugify, _write_json
@@ -15,6 +18,10 @@ SANDBOXES_DIR = GOVERNANCE_DIR / "sandboxes"
 TOKENS_DIR = GOVERNANCE_DIR / "capability_tokens"
 SUBAGENTS_DIR = Path("structure/worknet/subagents")
 PLANS_DIR = Path("structure/worknet/plans")
+
+SHELL_CONTROL_TOKENS = {";", "&&", "||", "|", ">", ">>", "<", "<<", "`", "$(", "${"}
+SECRET_NAME_RE = re.compile(r"(API[_-]?KEY|TOKEN|SECRET|PASSWORD|PRIVATE[_-]?KEY|ACCESS[_-]?KEY)", re.IGNORECASE)
+SECRET_VALUE_RE = re.compile(r"(sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{20,})")
 
 
 DEFAULT_POLICY = {
@@ -119,14 +126,24 @@ def _normalize_relative(root: Path, value: str) -> str:
     return target.as_posix().lstrip("./")
 
 
+def _safe_resolve_for_check(root: Path, value: str) -> Path:
+    base = root.resolve()
+    candidate = Path(value)
+    if not candidate.is_absolute():
+        candidate = base / candidate
+    return candidate.resolve(strict=False)
+
+
 def _path_allowed(root: Path, target: str, allowed_paths: list[str]) -> bool:
-    target_rel = _normalize_relative(root, target)
+    base = root.resolve()
+    target_resolved = _safe_resolve_for_check(root, target)
     for allowed in allowed_paths:
         allowed_clean = allowed.replace("\\", "/").lstrip("./")
         if allowed_clean == ".":
-            return True
+            return target_resolved == base or base in target_resolved.parents
         allowed_clean = allowed_clean.rstrip("/")
-        if target_rel == allowed_clean or target_rel.startswith(f"{allowed_clean}/"):
+        allowed_resolved = _safe_resolve_for_check(root, allowed_clean)
+        if target_resolved == allowed_resolved or allowed_resolved in target_resolved.parents:
             return True
     return False
 
@@ -253,7 +270,7 @@ def _load_approval(path: str, approval: str) -> tuple[Path, dict]:
     raise FileNotFoundError(f"approval/{approval}")
 
 
-def approval_grant(path: str = ".", approval: str = "", granted_by: str = "human") -> dict:
+def approval_grant(path: str = ".", approval: str = "", granted_by: str = "human", ttl_hours: int = 24) -> dict:
     governance_init(path)
     root = _root(path)
     approval_path, payload = _load_approval(path, approval)
@@ -273,6 +290,7 @@ def approval_grant(path: str = ".", approval: str = "", granted_by: str = "human
         "target": payload["target"],
         "status": "active",
         "created_at": _now(),
+        "expires_at": (datetime.now() + timedelta(hours=ttl_hours)).isoformat(timespec="seconds"),
     }
     token_path = token_root / f"{token_id}.json"
     _write_json(token_path, token)
@@ -280,16 +298,49 @@ def approval_grant(path: str = ".", approval: str = "", granted_by: str = "human
     return {"id": payload["id"], "output": str(approval_path), "token": str(token_path), "payload": payload}
 
 
+def token_revoke(path: str = ".", token: str = "", revoked_by: str = "human", reason: str = "") -> dict:
+    governance_init(path)
+    root = _root(path)
+    token_root = root / TOKENS_DIR
+    matches = sorted(token_root.glob(f"{token}*.json"))
+    if not matches:
+        raise FileNotFoundError(f"token/{token}")
+    token_path = matches[0]
+    payload = json.loads(token_path.read_text(encoding="utf-8"))
+    payload["status"] = "revoked"
+    payload["revoked_by"] = revoked_by
+    payload["revoked_at"] = _now()
+    payload["revocation_reason"] = reason
+    _write_json(token_path, payload)
+    _append_audit(path, "token_revoke", {"token": payload.get("id", token), "revoked_by": revoked_by})
+    return {"id": payload.get("id", token), "output": str(token_path), "payload": payload}
+
+
+def token_is_active(token: dict) -> bool:
+    if token.get("status") != "active":
+        return False
+    expires_at = token.get("expires_at", "")
+    if expires_at:
+        try:
+            if datetime.fromisoformat(expires_at) < datetime.now():
+                return False
+        except ValueError:
+            return False
+    return True
+
+
 def sandbox_check(path: str = ".", subagent: str = "", target_path: str = "") -> dict:
     governance_init(path)
     root = _root(path)
     _subagent_path, payload = _load_subagent(path, subagent)
     allowed = _path_allowed(root, target_path, payload.get("allowed_paths", []))
+    resolved = str(_safe_resolve_for_check(root, target_path))
     report = {
         "ok": allowed,
         "subagent": subagent,
         "permission": payload.get("permission", ""),
         "path": target_path,
+        "resolved_path": resolved,
         "allowed_paths": payload.get("allowed_paths", []),
         "status": "allowed" if allowed else "denied",
     }
@@ -305,11 +356,15 @@ def classify_command(command: str) -> str:
     command = command.strip()
     if not command:
         return "unknown"
+    if any(token in command for token in SHELL_CONTROL_TOKENS):
+        return "danger"
     try:
         parts = shlex.split(command)
     except ValueError:
         return "unknown"
     first = parts[0] if parts else ""
+    if "=" in first and not first.startswith("./"):
+        return "unknown"
     danger_prefixes = DEFAULT_POLICY["command_levels"]["danger"]
     if first in {"rm", "sudo", "chmod", "chown", "dd", "curl"}:
         return "danger"
@@ -324,6 +379,30 @@ def classify_command(command: str) -> str:
     if first in {"black", "ruff", "npm"} or any(_command_starts(command, prefix) for prefix in DEFAULT_POLICY["command_levels"]["write"]):
         return "write"
     return "unknown"
+
+
+def sanitize_environment(env: dict[str, str] | None = None) -> dict:
+    env = dict(env or os.environ)
+    removed = sorted(key for key in env if SECRET_NAME_RE.search(key))
+    sanitized = {key: value for key, value in env.items() if key not in removed}
+    return {"env": sanitized, "removed": removed}
+
+
+def secret_scan(path: str = ".", target_path: str = "") -> dict:
+    root = _root(path)
+    target = _safe_resolve_for_check(root, target_path)
+    base = root.resolve()
+    if target != base and base not in target.parents:
+        raise ValueError("Secret scan target escapes repository root")
+    findings = []
+    if target.exists() and target.is_file():
+        text = target.read_text(encoding="utf-8", errors="ignore")
+        for lineno, line in enumerate(text.splitlines(), start=1):
+            if SECRET_NAME_RE.search(line) or SECRET_VALUE_RE.search(line):
+                findings.append({"line": lineno, "kind": "possible-secret"})
+    report = {"ok": not findings, "path": target_path, "resolved_path": str(target), "findings": findings}
+    _append_audit(path, "secret_scan", {"target": target_path, "findings": len(findings)})
+    return report
 
 
 def command_check(path: str = ".", command: str = "", subagent: str = "", permission: str = "") -> dict:

@@ -403,8 +403,21 @@ structure-rule command-check --permission apply --cmd "python3 -m pytest"
 
 ```bash
 structure-rule approval-request subagent-0001 --action apply-patch --target src/model.py
-structure-rule approval-grant approval-0001
+structure-rule approval-grant approval-0001 --ttl-hours 24
+structure-rule token-revoke token-0001 --reason "Scope changed."
 ```
+
+Security checks are intentionally conservative:
+
+```bash
+structure-rule sandbox-check subagent-0001 --target structure/tasks/task.md
+structure-rule command-check --subagent subagent-0001 --cmd "pytest; rm -rf build"
+structure-rule secret-scan --target structure/tasks/draft.env
+```
+
+Sandbox checks resolve symlinks before deciding whether a path is allowed.
+Command checks classify shell control operators as dangerous. Capability tokens
+carry expiry timestamps and can be revoked.
 
 This layer does not call a model API yet. It exists so later model agents have a
 clear permission boundary before they can plan, draft, verify, or apply work.
@@ -745,6 +758,53 @@ The protocol file covers:
 metrics and toolbox files. `action_protocol.md` also requires protocol updates
 when a workflow, authority rule, or data contract changes.
 
+### 1.5.0 MCP, Security, And CI Layer
+
+The 1.5.0 release turns the MCP endpoint into a real JSON-RPC MCP server and
+hardens the governance boundary.
+
+MCP stdio mode:
+
+```bash
+structure-rule-mcp-server --path . --stdio
+```
+
+MCP HTTP mode:
+
+```bash
+structure-rule-mcp-server --path . --http --host 127.0.0.1 --port 8765
+```
+
+The server supports:
+
+- `initialize`
+- `resources/list`
+- `resources/read`
+- `tools/list`
+- `tools/call`
+
+The CLI keeps the old single-request mode for smoke tests:
+
+```bash
+structure-rule mcp-server --request '{"jsonrpc":"2.0","id":1,"method":"resources/list"}'
+```
+
+Security additions:
+
+- symlink-aware sandbox checks
+- argv-level command classification with shell control operators denied
+- capability token expiry
+- capability token revocation
+- one-file secret scanning for common secret patterns
+- environment sanitization helpers for secret-like variable names
+
+Packaging additions:
+
+- `structure-rule-mcp-server` console script
+- Ruff, mypy, coverage, and build dev dependencies
+- GitHub Actions CI for lint, type check, tests, coverage report, and package build
+- `RELEASE_CHECKLIST.md`
+
 ## Local Network Model
 
 Agent GitHub Worknet stores local collaboration objects under:
@@ -779,6 +839,10 @@ Model-agent actions also pass through governance checks:
 - shell commands go through `command-check`
 - apply-level work requires an approval record and capability token
 - dangerous commands are denied by default
+- symlink escapes are denied by sandbox checks
+- shell control operators are classified as dangerous commands
+- capability tokens expire and can be revoked
+- secret scans can be run before adopting generated files
 - live model API calls require `model-call --apply` and a matching token
 - stream runtime authority is expressed through P1-P13 corporate levels
 - P12 CEO agents still cannot override P13 human gates
@@ -822,6 +886,7 @@ structure-rule agent-export --target codex
 structure-rule skill-export --name project-structure
 structure-rule agent-sync --target codex
 structure-rule mcp-server
+structure-rule-mcp-server --stdio
 ```
 
 These commands make project structure readable and reusable by coding agents,
@@ -843,12 +908,12 @@ the path toward the 1.0 closure release.
 Current stable version:
 
 ```text
-1.4.4
+1.5.0
 ```
 
-The 1.4.4 release stabilizes project protocols: object contracts, authority
-rules, workflow flow, roundtable decisions, model API gates, GitHub sync,
-metrics, and handoff continuity.
+The 1.5.0 release adds a standard MCP server entry, security hardening for
+sandbox, commands, secrets, and tokens, plus CI, lint, type-check, coverage, and
+build packaging infrastructure.
 
 ## Philosophy
 

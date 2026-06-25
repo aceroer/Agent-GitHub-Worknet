@@ -3,6 +3,7 @@ from pathlib import Path
 from structure_rule_kit import (
     export_agent,
     export_all_agents,
+    handle_jsonrpc,
     export_skill,
     init_structure,
     list_resources,
@@ -72,3 +73,36 @@ def test_mcp_server_request(tmp_path):
     init_structure(str(tmp_path))
     result = run_server(str(tmp_path), '{"method":"resources/list"}')
     assert "resources" in result
+
+
+def test_mcp_jsonrpc_initialize_and_read(tmp_path):
+    init_structure(str(tmp_path))
+    initialized = handle_jsonrpc(str(tmp_path), {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}})
+    listed = handle_jsonrpc(str(tmp_path), {"jsonrpc": "2.0", "id": 2, "method": "resources/list", "params": {}})
+    read = handle_jsonrpc(
+        str(tmp_path),
+        {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "resources/read",
+            "params": {"uri": "structure-rule://STRUCTURE_RULE.md"},
+        },
+    )
+
+    assert initialized["result"]["serverInfo"]["name"] == "agent-github-worknet"
+    assert listed["result"]["resources"]
+    assert "Structure Rule" in read["result"]["contents"][0]["text"]
+
+
+def test_mcp_jsonrpc_tool_call(tmp_path):
+    init_structure(str(tmp_path))
+    response = handle_jsonrpc(
+        str(tmp_path),
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {"name": "structure_rule_summary", "arguments": {}},
+        },
+    )
+    assert response["result"]["content"][0]["type"] == "text"

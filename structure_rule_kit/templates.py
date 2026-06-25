@@ -278,6 +278,17 @@ Stabilize protocols and operating flows:
 - fixed roundtable protocol for meeting minutes, weighted votes, and organization review
 - fixed handoff and audit protocol for agent continuity
 
+## Version 1.5.0
+
+Add production integration hardening:
+
+- standard MCP JSON-RPC server with stdio and HTTP modes
+- symlink-aware sandbox checks
+- argv-level command classification and shell-control denial
+- secret scanning and environment sanitization helpers
+- capability token expiry and revocation
+- CI, lint, type-check, coverage, build, and release checklist
+
 ## Deferred Ideas
 
 - Optional project presets, only if they support the scriptable integration layer.

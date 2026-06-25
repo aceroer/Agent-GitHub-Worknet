@@ -6,7 +6,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from .governance import TOKENS_DIR, governance_init
+from .governance import TOKENS_DIR, governance_init, token_is_active
 from .network import _ensure_network, _find_item, _next_id, _now, _write_json
 
 
@@ -195,7 +195,7 @@ def _load_request(path: str, request: str) -> tuple[Path, dict]:
 
 
 def _token_matches(token: dict, subagent: str, action: str, target: str) -> bool:
-    if token.get("status") != "active":
+    if not token_is_active(token):
         return False
     if subagent and token.get("subagent") != subagent:
         return False

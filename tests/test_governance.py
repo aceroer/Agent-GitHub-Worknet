@@ -11,8 +11,11 @@ from structure_rule_kit import (
     init_structure,
     policy_show,
     sandbox_check,
+    secret_scan,
     subagent_create,
     subagent_plan,
+    token_is_active,
+    token_revoke,
 )
 from structure_rule_kit.cli import main
 
@@ -53,6 +56,18 @@ def test_subagent_create_and_sandbox(tmp_path):
     assert plan_denied["ok"] is False
 
 
+def test_sandbox_blocks_symlink_escape(tmp_path):
+    seed_project(tmp_path)
+    outside = tmp_path.parent / "outside-secret.txt"
+    outside.write_text("outside", encoding="utf-8")
+    link = tmp_path / "structure" / "tasks" / "escape.txt"
+    link.parent.mkdir(parents=True, exist_ok=True)
+    link.symlink_to(outside)
+    agent = subagent_create(str(tmp_path), permission="draft")
+    report = sandbox_check(str(tmp_path), agent["id"], "structure/tasks/escape.txt")
+    assert report["ok"] is False
+
+
 def test_command_check_permission_levels(tmp_path):
     seed_project(tmp_path)
     plan_agent = subagent_create(str(tmp_path), permission="plan")
@@ -63,6 +78,7 @@ def test_command_check_permission_levels(tmp_path):
     assert command_check(str(tmp_path), "rg TODO", subagent=draft_agent["id"])["ok"] is True
     assert command_check(str(tmp_path), "python3 -m pytest", subagent=apply_agent["id"])["ok"] is True
     assert command_check(str(tmp_path), "rm -rf build", subagent=apply_agent["id"])["ok"] is False
+    assert command_check(str(tmp_path), "pytest; rm -rf build", subagent=apply_agent["id"])["ok"] is False
 
 
 def test_approval_flow_creates_capability_token(tmp_path):
@@ -82,6 +98,29 @@ def test_approval_flow_creates_capability_token(tmp_path):
     assert grant["payload"]["status"] == "granted"
     assert token["status"] == "active"
     assert token["subagent"] == agent["id"]
+    assert "expires_at" in token
+    assert token_is_active(token) is True
+
+
+def test_token_revoke_and_secret_scan(tmp_path):
+    seed_project(tmp_path)
+    agent = subagent_create(str(tmp_path), permission="apply", issue="issue-0001")
+    request = approval_request(str(tmp_path), subagent=agent["id"], action="model-call", target="openai")
+    grant = approval_grant(str(tmp_path), request["id"])
+    token_path = Path(grant["token"])
+    token = json.loads(token_path.read_text(encoding="utf-8"))
+    revoked = token_revoke(str(tmp_path), token["id"], reason="test revoke")
+    revoked_token = json.loads(Path(revoked["output"]).read_text(encoding="utf-8"))
+
+    secret_file = tmp_path / "structure" / "tasks" / "draft.env"
+    secret_file.parent.mkdir(parents=True, exist_ok=True)
+    secret_file.write_text("OPENAI_API_KEY=sk-testsecretvalue1234567890\n", encoding="utf-8")
+    scan = secret_scan(str(tmp_path), "structure/tasks/draft.env")
+
+    assert revoked_token["status"] == "revoked"
+    assert token_is_active(revoked_token) is False
+    assert scan["ok"] is False
+    assert scan["findings"]
 
 
 def test_subagent_plan_from_issue(tmp_path):
