@@ -180,6 +180,15 @@ structure-rule executive-board
 structure-rule executive-appoint --office CTO --subagent subagent-0002 --by subagent-0001
 structure-rule executive-delegate --office CTO --stream stream-0001 --duty "Own the implementation route"
 structure-rule executive-report --office CFO --stream stream-0001 --summary "Token budget is stable."
+structure-rule role-report --role "QA Lead" --stream stream-0001 --summary "Relevant checks passed." --status verdict
+```
+
+Check publication gates before sensitive actions:
+
+```bash
+structure-rule gate-check --action commit
+structure-rule gate-check --action remote-push
+structure-rule gate-check --action gh-pr-create
 ```
 
 Record agent-native KPI/OKR signals:
@@ -752,11 +761,15 @@ The protocol file covers:
   creating a full company
 - worknet concurrency protocol: numbered object writes are serialized until
   atomic ID allocation or file locking is available
+- employee artifact protocol: active roles must leave reports, votes, reviews,
+  verification notes, or gate verdicts
 - roundtable protocol for minutes, weighted votes, and organization review
 - model API protocol for dry-runs, request packets, capability tokens, and
   response records
 - GitHub protocol for local-first records, explicit `--apply`, remote pullback,
   and sync reports
+- publication gate protocol for the boundary between local GitHub Worknet
+  objects and real GitHub or fork mutations
 - metrics protocol for evidence-backed agent behavior signals
 - handoff protocol for resumable agent continuity
 
@@ -914,11 +927,12 @@ the path toward the 1.0 closure release.
 Current stable version:
 
 ```text
-1.5.1
+1.5.2
 ```
 
-The 1.5.1 release fixes role rules into `structure/protocols.md`: P1-P13
-responsibilities, boundaries, executive office duties, and required outputs.
+The 1.5.2 release hardens GNW publication governance: active roles need
+artifacts, non-executive roles can write `role-report` records, and commit,
+push, and GitHub PR publication paths can be checked with `gate-check`.
 
 ## Philosophy
 

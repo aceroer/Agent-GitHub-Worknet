@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from .governance import SANDBOXES_DIR, SUBAGENTS_DIR, governance_init, load_policy
-from .network import _ensure_network, _find_item, _now, _write_json
+from .network import _ensure_network, _find_item, _now, _slugify, _write_json
 
 
 RUNTIME_DIR = Path("structure/worknet/runtime")
@@ -15,6 +15,7 @@ CEO_PLANS_DIR = RUNTIME_DIR / "ceo_plans"
 EXECUTIVES_DIR = RUNTIME_DIR / "executives"
 APPOINTMENTS_DIR = EXECUTIVES_DIR / "appointments"
 EXECUTIVE_REPORTS_DIR = EXECUTIVES_DIR / "reports"
+ROLE_REPORTS_DIR = RUNTIME_DIR / "role_reports"
 EXECUTIVE_BOARD_FILE = EXECUTIVES_DIR / "executive_board.json"
 CURRENT_STREAM = RUNTIME_DIR / "current_stream.json"
 ROLE_FILE = ROLES_DIR / "corporate_levels.json"
@@ -191,6 +192,7 @@ def runtime_init(path: str = ".", force: bool = False) -> dict:
         root / EXECUTIVES_DIR,
         root / APPOINTMENTS_DIR,
         root / EXECUTIVE_REPORTS_DIR,
+        root / ROLE_REPORTS_DIR,
     ]:
         directory.mkdir(parents=True, exist_ok=True)
     role_path = root / ROLE_FILE
@@ -432,6 +434,46 @@ def executive_report(
     return {"id": report_id, "office": office, "output": str(output), "payload": payload}
 
 
+def role_report(
+    path: str = ".",
+    role: str = "",
+    stream: str = "",
+    summary: str = "",
+    by: str = "",
+    status: str = "artifact",
+) -> dict:
+    runtime_init(path)
+    normalized_role = _slugify(role or "role")
+    report_root = _root(path) / ROLE_REPORTS_DIR
+    report_id = _next_record_id(report_root, f"{normalized_role}-report", ".json")
+    payload = {
+        "id": report_id,
+        "role": role.strip() or "role",
+        "stream": stream,
+        "reported_by": by,
+        "summary": summary or "Not specified.",
+        "status": status or "artifact",
+        "created_at": _now(),
+    }
+    output = report_root / f"{report_id}.json"
+    _write_json(output, payload)
+    if stream:
+        stream_event(
+            path,
+            stream=stream,
+            event_type="role_report",
+            actor=by,
+            message=f"{payload['role']} report: {payload['summary']}",
+            payload={"report": str(output), "role": payload["role"], "status": payload["status"]},
+        )
+    _append_runtime_log(
+        path,
+        "role_report",
+        {"role": payload["role"], "stream": stream, "report": str(output), "status": payload["status"]},
+    )
+    return {"id": report_id, "role": payload["role"], "output": str(output), "payload": payload}
+
+
 def assignment_create(
     path: str = ".",
     subagent: str = "",
@@ -641,6 +683,7 @@ def runtime_status(path: str = ".") -> dict:
     plans = list((root / CEO_PLANS_DIR).glob("*.json"))
     appointments = list((root / APPOINTMENTS_DIR).glob("*.json"))
     executive_reports = list((root / EXECUTIVE_REPORTS_DIR).glob("*.json"))
+    role_reports = list((root / ROLE_REPORTS_DIR).glob("*.json"))
     current_path = root / CURRENT_STREAM
     current = json.loads(current_path.read_text(encoding="utf-8")) if current_path.exists() else None
     log_path = root / RUNTIME_LOG
@@ -652,6 +695,7 @@ def runtime_status(path: str = ".") -> dict:
         "ceo_plans": len(plans),
         "executive_appointments": len(appointments),
         "executive_reports": len(executive_reports),
+        "role_reports": len(role_reports),
         "current": current,
         "runtime_events": log_events,
         "roles": str(root / ROLE_FILE),

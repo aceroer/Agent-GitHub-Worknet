@@ -289,6 +289,15 @@ Add production integration hardening:
 - capability token expiry and revocation
 - CI, lint, type-check, coverage, build, and release checklist
 
+## Version 1.5.2
+
+Harden GNW publication governance after real trial feedback:
+
+- role reports for non-executive artifacts
+- gate checks for commit, remote push, and GitHub PR publication
+- protocol split between local GitHub Worknet and remote GitHub publication
+- real incident trace for future workflow audits
+
 ## Deferred Ideas
 
 - Optional project presets, only if they support the scriptable integration layer.
@@ -442,6 +451,20 @@ Executive offices are specialized P-level roles below P13. They describe respons
 
 Executives can be delegated work on streams or issues. They can recommend decisions, but appointments, organization changes, high-risk actions, and remote writes remain gated by P12/P13 rules.
 
+## Employee Artifact Protocol
+
+An employee or office is active only when it produces a timestamped artifact
+that affects a later decision. Acceptable artifacts include route notes, review
+notes, verification verdicts, security gate verdicts, votes, meeting minutes,
+or role reports.
+
+Use `structure-rule role-report` for non-executive roles such as CEO, QA Lead,
+Docs Lead, reviewer, or release operator. If a named role has no independent
+artifact, mark it as `record-only` and do not claim it as a working contributor.
+
+The CEO should decide from employee artifacts, not replace employee work with
+after-the-fact role labels.
+
 ## Workflow Protocol
 
 The default work flow is:
@@ -529,6 +552,38 @@ GitHub sync is explicit:
 - Pull remote state before claiming remote closure when practical.
 - Preserve remote URLs and issue numbers once linked.
 - Write a sync report when local and remote state diverge.
+
+## Publication Gate Protocol
+
+GitHub Worknet means local records only: local issues, branches, tasks,
+sessions, verification records, PR records, sync reports, and GitHub-ready
+markdown artifacts.
+
+GitHub Remote Publication means any real mutation to GitHub or a fork,
+including `git push`, `gh pr create`, `gh issue comment`, `gh pr ready`,
+`gh pr merge`, and `gh pr close`.
+
+Remote publication is never implied by a GitHub Worknet task. Default stop
+point for a company-governed trial is:
+
+```text
+local worknet complete + GitHub-ready artifacts prepared
+```
+
+Before gated actions, run the matching preflight:
+
+```bash
+structure-rule gate-check --action commit
+structure-rule gate-check --action remote-push
+structure-rule gate-check --action gh-pr-create
+```
+
+Missing approval is a blocker even when the shell can technically execute the
+command. The CEO may coordinate, request, and prepare gated actions, but cannot
+self-certify P13 or board approval.
+
+Final pre-commit and pre-publication gates should be serial. Exploratory checks
+may be parallel, but final gate evidence should be reviewed in order.
 
 ## Metrics Protocol
 

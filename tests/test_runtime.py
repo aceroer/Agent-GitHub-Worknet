@@ -13,6 +13,7 @@ from structure_rule_kit import (
     human_takeover,
     init_structure,
     level_allows,
+    role_report,
     role_show,
     runtime_init,
     runtime_status,
@@ -157,6 +158,27 @@ def test_executive_appoint_requires_ceo_or_human(tmp_path):
     assert human["payload"]["appointed_by"] == "human"
 
 
+def test_role_report_accepts_non_executive_artifacts(tmp_path):
+    subagent = seed_runtime_project(tmp_path)
+    stream = stream_start(str(tmp_path), issue="issue-0001", ceo_agent=subagent["id"])
+    report = role_report(
+        str(tmp_path),
+        role="QA Lead",
+        stream=stream["id"],
+        summary="Relevant checks passed.",
+        by=subagent["id"],
+        status="verdict",
+    )
+    shown = stream_show(str(tmp_path), stream=stream["id"])
+    status = runtime_status(str(tmp_path))
+
+    payload = json.loads(Path(report["output"]).read_text(encoding="utf-8"))
+    assert payload["role"] == "QA Lead"
+    assert payload["status"] == "verdict"
+    assert shown["events"][-1]["type"] == "role_report"
+    assert status["role_reports"] == 1
+
+
 def test_runtime_cli_commands(tmp_path):
     subagent = seed_runtime_project(tmp_path)
 
@@ -174,6 +196,7 @@ def test_runtime_cli_commands(tmp_path):
     assert main(["executive-appoint", "--path", str(tmp_path), "--office", "COO", "--subagent", subagent["id"], "--by", "human"]) == 0
     assert main(["executive-delegate", "--path", str(tmp_path), "--office", "COO", "--stream", "stream-0001", "--duty", "Own delivery."]) == 0
     assert main(["executive-report", "--path", str(tmp_path), "--office", "COO", "--stream", "stream-0001", "--summary", "Delivery stream stable."]) == 0
+    assert main(["role-report", "--path", str(tmp_path), "--role", "QA Lead", "--stream", "stream-0001", "--summary", "Checks reviewed.", "--status", "verdict"]) == 0
     assert main(["stream-show", "stream-0001", "--path", str(tmp_path)]) == 0
     assert main(["runtime-status", "--path", str(tmp_path)]) == 0
 
@@ -183,3 +206,4 @@ def test_runtime_cli_commands(tmp_path):
     assert status["ceo_plans"] == 1
     assert status["executive_appointments"] == 1
     assert status["executive_reports"] == 1
+    assert status["role_reports"] == 1

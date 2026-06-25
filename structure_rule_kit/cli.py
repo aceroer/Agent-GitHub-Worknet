@@ -45,6 +45,7 @@ from .governance import (
     approval_grant,
     approval_request,
     command_check,
+    gate_check,
     governance_init,
     governance_status,
     policy_show,
@@ -125,6 +126,7 @@ from .runtime import (
     human_takeover,
     level_allows,
     role_show,
+    role_report,
     runtime_init,
     runtime_status,
     stream_event,
@@ -625,6 +627,13 @@ def main(argv: list[str] | None = None) -> int:
     command_check_parser.add_argument("--cmd", required=True)
     command_check_parser.add_argument("--json", action="store_true")
 
+    gate_check_parser = subparsers.add_parser("gate-check", help="Check approval for commit, push, PR, or other gated actions")
+    gate_check_parser.add_argument("--path", default=".")
+    gate_check_parser.add_argument("--action", required=True)
+    gate_check_parser.add_argument("--subagent", default="")
+    gate_check_parser.add_argument("--target", default="")
+    gate_check_parser.add_argument("--json", action="store_true")
+
     secret_scan_parser = subparsers.add_parser("secret-scan", help="Scan one file for common secret patterns")
     secret_scan_parser.add_argument("--path", default=".")
     secret_scan_parser.add_argument("--target", required=True)
@@ -768,6 +777,14 @@ def main(argv: list[str] | None = None) -> int:
     executive_report_parser.add_argument("--stream", default="")
     executive_report_parser.add_argument("--summary", default="")
     executive_report_parser.add_argument("--by", default="")
+
+    role_report_parser = subparsers.add_parser("role-report", help="Write a report for any role, including CEO, QA, or Docs")
+    role_report_parser.add_argument("--path", default=".")
+    role_report_parser.add_argument("--role", required=True)
+    role_report_parser.add_argument("--stream", default="")
+    role_report_parser.add_argument("--summary", default="")
+    role_report_parser.add_argument("--by", default="")
+    role_report_parser.add_argument("--status", default="artifact")
 
     metrics_init_parser = subparsers.add_parser("metrics-init", help="Initialize agent KPI/OKR metrics")
     metrics_init_parser.add_argument("--path", default=".")
@@ -1581,6 +1598,17 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{report['status'].upper()}: {report['level']} command under {report['permission']}")
         return 0 if report["ok"] else 1
 
+    if args.command == "gate-check":
+        report = gate_check(args.path, action=args.action, subagent=args.subagent, target=args.target)
+        if args.json:
+            print(json.dumps(report, indent=2))
+        else:
+            print(f"{'APPROVED' if report['ok'] else 'BLOCKED'}: {report['action']}")
+            print(report["message"])
+            if report["matching_tokens"]:
+                print(f"Tokens: {', '.join(report['matching_tokens'])}")
+        return 0 if report["ok"] else 1
+
     if args.command == "secret-scan":
         report = secret_scan(args.path, target_path=args.target)
         if args.json:
@@ -1782,6 +1810,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"CEO plans: {report['ceo_plans']}")
             print(f"Executive appointments: {report['executive_appointments']}")
             print(f"Executive reports: {report['executive_reports']}")
+            print(f"Role reports: {report['role_reports']}")
             if report["current"]:
                 print(f"Current stream: {report['current'].get('stream')} ({report['current'].get('state')})")
         return 0 if report["ready"] else 1
@@ -1844,6 +1873,18 @@ def main(argv: list[str] | None = None) -> int:
             by=args.by,
         )
         print(f"Report {report['id']}: {Path(report['output'])}")
+        return 0
+
+    if args.command == "role-report":
+        report = role_report(
+            args.path,
+            role=args.role,
+            stream=args.stream,
+            summary=args.summary,
+            by=args.by,
+            status=args.status,
+        )
+        print(f"Role report {report['id']}: {Path(report['output'])}")
         return 0
 
     if args.command == "metrics-init":

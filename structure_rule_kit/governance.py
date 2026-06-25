@@ -62,6 +62,51 @@ DEFAULT_POLICY = {
     ],
 }
 
+GATED_ACTIONS = {
+    "commit": {
+        "aliases": ["git-commit", "git commit"],
+        "required_action": "commit",
+        "description": "Create a local git commit.",
+        "examples": ["git commit"],
+    },
+    "remote-push": {
+        "aliases": ["push", "git-push", "git push"],
+        "required_action": "remote-push",
+        "description": "Push local commits to a remote repository or fork.",
+        "examples": ["git push"],
+    },
+    "gh-pr-create": {
+        "aliases": ["pr-create", "github-pr-create", "gh pr create"],
+        "required_action": "gh-pr-create",
+        "description": "Create a GitHub pull request.",
+        "examples": ["gh pr create"],
+    },
+    "gh-issue-comment": {
+        "aliases": ["issue-comment", "github-issue-comment", "gh issue comment"],
+        "required_action": "gh-issue-comment",
+        "description": "Write a GitHub issue comment.",
+        "examples": ["gh issue comment"],
+    },
+    "gh-pr-ready": {
+        "aliases": ["pr-ready", "github-pr-ready", "gh pr ready"],
+        "required_action": "gh-pr-ready",
+        "description": "Mark a draft GitHub pull request ready for review.",
+        "examples": ["gh pr ready"],
+    },
+    "gh-pr-merge": {
+        "aliases": ["pr-merge", "github-pr-merge", "gh pr merge"],
+        "required_action": "gh-pr-merge",
+        "description": "Merge a GitHub pull request.",
+        "examples": ["gh pr merge"],
+    },
+    "gh-pr-close": {
+        "aliases": ["pr-close", "github-pr-close", "gh pr close"],
+        "required_action": "gh-pr-close",
+        "description": "Close a GitHub pull request.",
+        "examples": ["gh pr close"],
+    },
+}
+
 
 def _root(path: str = ".") -> Path:
     return Path(path)
@@ -327,6 +372,74 @@ def token_is_active(token: dict) -> bool:
         except ValueError:
             return False
     return True
+
+
+def _canonical_gate_action(action: str) -> str:
+    normalized = action.strip().lower()
+    for canonical, definition in GATED_ACTIONS.items():
+        names = [canonical, *definition.get("aliases", [])]
+        if normalized in {name.lower() for name in names}:
+            return canonical
+    return normalized
+
+
+def _load_tokens(path: str) -> list[dict]:
+    token_root = _root(path) / TOKENS_DIR
+    if not token_root.exists():
+        return []
+    tokens = []
+    for token_path in sorted(token_root.glob("*.json")):
+        try:
+            tokens.append(json.loads(token_path.read_text(encoding="utf-8")))
+        except json.JSONDecodeError:
+            tokens.append({"id": token_path.stem, "status": "invalid", "path": str(token_path)})
+    return tokens
+
+
+def gate_check(path: str = ".", action: str = "", subagent: str = "", target: str = "") -> dict:
+    governance_init(path)
+    canonical = _canonical_gate_action(action)
+    definition = GATED_ACTIONS.get(canonical, {})
+    required_action = definition.get("required_action", canonical)
+    tokens = _load_tokens(path)
+    matches = []
+    inactive_matches = []
+    for token in tokens:
+        action_matches = token.get("action") in {required_action, canonical, action}
+        subagent_matches = not subagent or token.get("subagent") == subagent
+        target_matches = not target or token.get("target") in {"", target}
+        if not (action_matches and subagent_matches and target_matches):
+            continue
+        if token_is_active(token):
+            matches.append(token)
+        else:
+            inactive_matches.append(token)
+    ok = bool(matches)
+    report = {
+        "ok": ok,
+        "action": canonical,
+        "requested_action": action,
+        "required_action": required_action,
+        "target": target,
+        "subagent": subagent,
+        "status": "approved" if ok else "blocked",
+        "description": definition.get("description", "Gated action requires explicit approval."),
+        "matching_tokens": [token.get("id", "") for token in matches],
+        "inactive_tokens": [token.get("id", "") for token in inactive_matches],
+        "message": "Approval token found." if ok else "Missing active approval token for gated action.",
+    }
+    _append_audit(
+        path,
+        "gate_check",
+        {
+            "action": canonical,
+            "target": target,
+            "subagent": subagent,
+            "status": report["status"],
+            "matching_tokens": report["matching_tokens"],
+        },
+    )
+    return report
 
 
 def sandbox_check(path: str = ".", subagent: str = "", target_path: str = "") -> dict:

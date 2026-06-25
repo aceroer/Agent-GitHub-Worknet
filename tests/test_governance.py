@@ -6,6 +6,7 @@ from structure_rule_kit import (
     approval_request,
     command_check,
     create_issue,
+    gate_check,
     governance_init,
     governance_status,
     init_structure,
@@ -102,6 +103,28 @@ def test_approval_flow_creates_capability_token(tmp_path):
     assert token_is_active(token) is True
 
 
+def test_gate_check_requires_active_approval_token(tmp_path):
+    seed_project(tmp_path)
+    agent = subagent_create(str(tmp_path), permission="apply", issue="issue-0001")
+
+    blocked = gate_check(str(tmp_path), action="gh-pr-create", subagent=agent["id"])
+    assert blocked["ok"] is False
+    assert blocked["status"] == "blocked"
+
+    request = approval_request(
+        str(tmp_path),
+        subagent=agent["id"],
+        action="gh-pr-create",
+        target="",
+        reason="Board approved draft PR publication.",
+    )
+    approval_grant(str(tmp_path), request["id"], granted_by="human")
+    approved = gate_check(str(tmp_path), action="gh pr create", subagent=agent["id"])
+    assert approved["ok"] is True
+    assert approved["status"] == "approved"
+    assert approved["matching_tokens"] == ["token-0001"]
+
+
 def test_token_revoke_and_secret_scan(tmp_path):
     seed_project(tmp_path)
     agent = subagent_create(str(tmp_path), permission="apply", issue="issue-0001")
@@ -143,6 +166,7 @@ def test_governance_cli_commands(tmp_path):
     assert main(["sandbox-check", "subagent-0001", "--path", str(tmp_path), "--target", "src/model.py"]) == 1
     assert main(["command-check", "--path", str(tmp_path), "--subagent", "subagent-0001", "--cmd", "rg TODO"]) == 0
     assert main(["command-check", "--path", str(tmp_path), "--subagent", "subagent-0001", "--cmd", "pytest"]) == 1
+    assert main(["gate-check", "--path", str(tmp_path), "--action", "gh-pr-create", "--subagent", "subagent-0001"]) == 1
     assert main(["approval-request", "subagent-0001", "--path", str(tmp_path), "--action", "apply-patch"]) == 0
     assert main(["approval-grant", "approval-0001", "--path", str(tmp_path)]) == 0
     assert main(["governance-status", "--path", str(tmp_path)]) == 0

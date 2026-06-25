@@ -35,6 +35,7 @@ experimental/closure/
 ├── ROADMAP.md
 ├── REAL_TRACE_2026-06-16.md
 ├── REAL_TRACE_2026-06-25_SERFBOUND_GNW_TRIAL.md
+├── REAL_TRACE_2026-06-25_SOROKIT_UI_129_INCIDENT.md
 ├── github_config.example.json
 └── scripts/
     ├── github_doctor.py
@@ -55,6 +56,12 @@ let experimental assumptions leak into the stable package API too early.
 company-style GNW trial. It is useful not only as a GitHub workflow trace, but
 also as a management trace: CEO delegation, office ownership, remote-write
 gates, and the need for locked or atomic worknet object writes.
+
+`REAL_TRACE_2026-06-25_SOROKIT_UI_129_INCIDENT.md` records a follow-up
+governance failure where technical work succeeded but the CEO path confused
+local GitHub Worknet completion with remote GitHub publication. It motivated
+role reports, publication gate checks, and stronger protocol wording around
+record-only employees.
 
 ## Quick Checks
 

@@ -37,6 +37,15 @@ local notes.
 - Human owners have final authority.
 - Remote writes and broad changes require explicit approval.
 - Organization changes should be reviewed by a supervisor role.
+- GitHub Worknet means local records. GitHub Remote Publication means real GitHub or fork mutation.
+- Run `structure-rule gate-check --action commit`, `--action remote-push`, or `--action gh-pr-create` before sensitive publication actions.
+- Missing approval blocks the action even if the shell command is technically allowed.
+
+## Employee Artifact Protocol
+
+- Active roles should leave artifacts such as reports, votes, reviews, verification notes, or gate verdicts.
+- Roles without independent artifacts should be marked record-only.
+- Use `structure-rule role-report` for QA, Docs, CEO, release, or other non-executive reports.
 
 ## Handoff Protocol
 

@@ -146,6 +146,15 @@ Add production integration hardening:
 - capability token expiry and revocation
 - CI, lint, type-check, coverage, build, and release checklist
 
+## Version 1.5.2
+
+Harden GNW publication governance after real trial feedback:
+
+- role reports for non-executive artifacts
+- gate checks for commit, remote push, and GitHub PR publication
+- protocol split between local GitHub Worknet and remote GitHub publication
+- real incident trace for future workflow audits
+
 ## Deferred Ideas
 
 - Optional presets, only if they support the integration tools.
