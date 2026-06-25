@@ -32,6 +32,12 @@ The 1.1 workflow loop is:
 GitHub repo -> local issue -> agent task -> work session -> verification -> GitHub comment -> sync report
 ```
 
+The 1.2 governance loop adds a safe shell around future model agents:
+
+```text
+issue -> subagent plan -> governed subagent -> sandbox check -> command check -> approval -> capability token
+```
+
 ## Install
 
 ```bash
@@ -112,6 +118,16 @@ structure-rule task-from-issue issue-0001
 structure-rule work-start issue-0001
 structure-rule work-end --done "Implemented parser" --cmd "python3 -m pytest" --run
 structure-rule worknet-status
+```
+
+Initialize the governance layer before introducing model-backed subagents:
+
+```bash
+structure-rule governance-init
+structure-rule subagent-plan issue-0001
+structure-rule subagent-create --permission draft --issue issue-0001
+structure-rule sandbox-check subagent-0001 --target structure/tasks/task.md
+structure-rule command-check --subagent subagent-0001 --cmd "rg TODO"
 ```
 
 The sync report is written to:
@@ -249,6 +265,74 @@ structure-rule worknet-status
 structure-rule worknet-status --json
 ```
 
+## 1.2 Governance Commands
+
+The 1.2 layer prepares Agent GitHub Worknet for model-backed subagents without
+turning on autonomous execution. It records policy, sandboxes, approval
+requests, capability tokens, and audit events under:
+
+```text
+structure/worknet/governance/
+├── policy.json
+├── audit_log.jsonl
+├── approvals/
+├── sandboxes/
+└── capability_tokens/
+```
+
+`governance-init` creates the governance files:
+
+```bash
+structure-rule governance-init
+structure-rule policy-show
+structure-rule policy-show --json
+```
+
+The default permission levels are intentionally conservative:
+
+- `plan`: read context and generate plans only
+- `draft`: write local worknet, task, and draft artifacts
+- `apply`: apply broader project changes only after explicit approval
+
+`subagent-plan` creates a deterministic role plan for a local issue:
+
+```bash
+structure-rule subagent-plan issue-0001
+```
+
+`subagent-create` creates a governed subagent record and a matching sandbox:
+
+```bash
+structure-rule subagent-create --permission plan --issue issue-0001
+structure-rule subagent-create --permission draft --issue issue-0001
+structure-rule subagent-create --permission apply --issue issue-0001
+```
+
+`sandbox-check` tests whether a subagent may write a path:
+
+```bash
+structure-rule sandbox-check subagent-0001 --target structure/tasks/task.md
+structure-rule sandbox-check subagent-0001 --target src/model.py
+```
+
+`command-check` classifies commands as `read`, `verify`, `write`, `danger`, or
+`unknown`, then checks the subagent permission:
+
+```bash
+structure-rule command-check --subagent subagent-0001 --cmd "rg TODO"
+structure-rule command-check --permission apply --cmd "python3 -m pytest"
+```
+
+`approval-request` and `approval-grant` create the human approval trail:
+
+```bash
+structure-rule approval-request subagent-0001 --action apply-patch --target src/model.py
+structure-rule approval-grant approval-0001
+```
+
+This layer does not call a model API yet. It exists so later model agents have a
+clear permission boundary before they can plan, draft, verify, or apply work.
+
 ## Local Network Model
 
 Agent GitHub Worknet stores local collaboration objects under:
@@ -276,6 +360,13 @@ Remote writes require `--apply`.
 
 Without `--apply`, commands stay in dry-run or reporting mode. This makes the
 tool safe for agents to inspect and plan before touching GitHub.
+
+Model-agent actions also pass through governance checks:
+
+- path writes go through `sandbox-check`
+- shell commands go through `command-check`
+- apply-level work requires an approval record and capability token
+- dangerous commands are denied by default
 
 Duplicate protection is built in:
 
@@ -331,11 +422,12 @@ the path toward the 1.0 closure release.
 Current stable version:
 
 ```text
-1.1.0
+1.2.0
 ```
 
-The 1.1 release adds auto repo configuration, task/issue binding, work sessions,
-verification-aware work endings, GitHub comments, and worknet status output.
+The 1.2 release adds the governance and sandbox foundation for future
+model-backed subagents: policy files, subagent records, path sandboxes, command
+classification, approvals, capability tokens, audit logs, and CLI checks.
 
 ## Philosophy
 

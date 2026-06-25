@@ -60,6 +60,18 @@ Add agent workflow commands for repo auto-detection, GitHub comments,
 task/issue binding, work sessions, verification-aware endings, and status
 summaries.
 
+## Version 1.2
+
+Add model-agent governance foundations:
+
+- governance policy initialization
+- plan/draft/apply permission levels
+- governed subagent records
+- path sandbox checks
+- command classification checks
+- approval requests and capability tokens
+- audit log for governance actions
+
 ## Deferred Ideas
 
 - Optional presets, only if they support the integration tools.

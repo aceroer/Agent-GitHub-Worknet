@@ -41,6 +41,17 @@ from .github_bridge import (
     github_sync_report,
     write_github_config,
 )
+from .governance import (
+    approval_grant,
+    approval_request,
+    command_check,
+    governance_init,
+    governance_status,
+    policy_show,
+    sandbox_check,
+    subagent_create,
+    subagent_plan,
+)
 from .handoff import build_handoff_pack
 from .mcp_manifest import build_mcp_manifest
 from .mcp_scaffold import scaffold_mcp
@@ -506,6 +517,56 @@ def main(argv: list[str] | None = None) -> int:
     worknet_status_parser = subparsers.add_parser("worknet-status", help="Show Agent GitHub Worknet status")
     worknet_status_parser.add_argument("--path", default=".")
     worknet_status_parser.add_argument("--json", action="store_true")
+
+    governance_init_parser = subparsers.add_parser("governance-init", help="Initialize model-agent governance files")
+    governance_init_parser.add_argument("--path", default=".")
+    governance_init_parser.add_argument("--force", action="store_true")
+
+    policy_show_parser = subparsers.add_parser("policy-show", help="Show model-agent governance policy")
+    policy_show_parser.add_argument("--path", default=".")
+    policy_show_parser.add_argument("--json", action="store_true")
+
+    subagent_plan_parser = subparsers.add_parser("subagent-plan", help="Plan subagent roles for a local issue")
+    subagent_plan_parser.add_argument("issue")
+    subagent_plan_parser.add_argument("--path", default=".")
+    subagent_plan_parser.add_argument("--output-dir", default="structure/worknet/plans")
+
+    subagent_create_parser = subparsers.add_parser("subagent-create", help="Create a governed subagent record")
+    subagent_create_parser.add_argument("--path", default=".")
+    subagent_create_parser.add_argument("--name", default="")
+    subagent_create_parser.add_argument("--permission", default="plan", choices=["plan", "draft", "apply"])
+    subagent_create_parser.add_argument("--goal", default="")
+    subagent_create_parser.add_argument("--issue", default="")
+    subagent_create_parser.add_argument("--allowed-path", action="append", default=[])
+
+    approval_request_parser = subparsers.add_parser("approval-request", help="Request approval for a subagent action")
+    approval_request_parser.add_argument("subagent")
+    approval_request_parser.add_argument("--path", default=".")
+    approval_request_parser.add_argument("--action", default="")
+    approval_request_parser.add_argument("--target", default="")
+    approval_request_parser.add_argument("--reason", default="")
+
+    approval_grant_parser = subparsers.add_parser("approval-grant", help="Grant an approval and issue a capability token")
+    approval_grant_parser.add_argument("approval")
+    approval_grant_parser.add_argument("--path", default=".")
+    approval_grant_parser.add_argument("--granted-by", default="human")
+
+    sandbox_check_parser = subparsers.add_parser("sandbox-check", help="Check whether a subagent may write a path")
+    sandbox_check_parser.add_argument("subagent")
+    sandbox_check_parser.add_argument("--path", default=".")
+    sandbox_check_parser.add_argument("--target", required=True)
+    sandbox_check_parser.add_argument("--json", action="store_true")
+
+    command_check_parser = subparsers.add_parser("command-check", help="Check whether a subagent may run a command")
+    command_check_parser.add_argument("--path", default=".")
+    command_check_parser.add_argument("--subagent", default="")
+    command_check_parser.add_argument("--permission", default="")
+    command_check_parser.add_argument("--cmd", required=True)
+    command_check_parser.add_argument("--json", action="store_true")
+
+    governance_status_parser = subparsers.add_parser("governance-status", help="Show model-agent governance status")
+    governance_status_parser.add_argument("--path", default=".")
+    governance_status_parser.add_argument("--json", action="store_true")
 
     args = parser.parse_args(argv)
 
@@ -1129,6 +1190,86 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Issues: {report['issues']}")
             if report["current"]:
                 print(f"Current: {report['current'].get('issue')}")
+        return 0 if report["ready"] else 1
+
+    if args.command == "governance-init":
+        report = governance_init(args.path, force=args.force)
+        print(f"Governance: {Path(report['output'])}")
+        print(f"Policy: {Path(report['policy'])}")
+        return 0
+
+    if args.command == "policy-show":
+        report = policy_show(args.path)
+        if args.json:
+            print(json.dumps(report, indent=2))
+        else:
+            print(f"Policy version: {report['version']}")
+            print("Permissions:")
+            for name in report["permissions"]:
+                print(f"- {name}")
+        return 0
+
+    if args.command == "subagent-plan":
+        report = subagent_plan(args.path, issue=args.issue, output_dir=args.output_dir)
+        print(f"Wrote {Path(report['output'])}")
+        return 0
+
+    if args.command == "subagent-create":
+        report = subagent_create(
+            args.path,
+            name=args.name,
+            permission=args.permission,
+            goal=args.goal,
+            issue=args.issue,
+            allowed_paths=args.allowed_path or None,
+        )
+        print(f"Created {report['id']}: {Path(report['output'])}")
+        print(f"Sandbox: {Path(report['sandbox'])}")
+        return 0
+
+    if args.command == "approval-request":
+        report = approval_request(
+            args.path,
+            subagent=args.subagent,
+            action=args.action,
+            target=args.target,
+            reason=args.reason,
+        )
+        print(f"Requested {report['id']}: {Path(report['output'])}")
+        return 0
+
+    if args.command == "approval-grant":
+        report = approval_grant(args.path, approval=args.approval, granted_by=args.granted_by)
+        print(f"Granted {report['id']}")
+        print(f"Token: {Path(report['token'])}")
+        return 0
+
+    if args.command == "sandbox-check":
+        report = sandbox_check(args.path, subagent=args.subagent, target_path=args.target)
+        if args.json:
+            print(json.dumps(report, indent=2))
+        else:
+            print(f"{report['status'].upper()}: {report['path']}")
+        return 0 if report["ok"] else 1
+
+    if args.command == "command-check":
+        report = command_check(args.path, command=args.cmd, subagent=args.subagent, permission=args.permission)
+        if args.json:
+            print(json.dumps(report, indent=2))
+        else:
+            print(f"{report['status'].upper()}: {report['level']} command under {report['permission']}")
+        return 0 if report["ok"] else 1
+
+    if args.command == "governance-status":
+        report = governance_status(args.path)
+        if args.json:
+            print(json.dumps(report, indent=2))
+        else:
+            print("READY" if report["ready"] else "NEEDS SETUP")
+            print(f"Subagents: {report['subagents']}")
+            print(f"Approvals: {report['approvals']}")
+            print(f"Tokens: {report['tokens']}")
+            print(f"Audit events: {report['audit_events']}")
         return 0 if report["ready"] else 1
 
     parser.error("Unknown command")
