@@ -244,6 +244,17 @@ Add an executive layer under the CEO agent:
 - executive reports
 - executive board status
 
+## Version 1.4.2
+
+Add agent-native KPI/OKR metrics:
+
+- Reliability: accepted or adopted outputs
+- Delegation: useful task decomposition and assignment
+- Coordination: net collaborative benefit
+- Correction: fast, accurate response to feedback
+- Exploration: valuable new routes rather than mechanical repetition
+- scorecards, OKRs, metric events, and metrics status
+
 ## Deferred Ideas
 
 - Optional project presets, only if they support the scriptable integration layer.

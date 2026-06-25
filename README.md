@@ -172,6 +172,16 @@ structure-rule executive-delegate --office CTO --stream stream-0001 --duty "Own 
 structure-rule executive-report --office CFO --stream stream-0001 --summary "Token budget is stable."
 ```
 
+Record agent-native KPI/OKR signals:
+
+```bash
+structure-rule metrics-init
+structure-rule metric-record --agent subagent-0001 --metric Reliability --score 5 --stream stream-0001
+structure-rule scorecard-build --agent subagent-0001 --stream stream-0001
+structure-rule okr-set --agent subagent-0001 --objective "Improve useful exploration" --metric Exploration --target 4
+structure-rule okr-review okr-0001
+```
+
 The sync report is written to:
 
 ```text
@@ -564,6 +574,56 @@ structure-rule executive-report --office CFO --stream stream-0001 --summary "Bud
 `executive-appoint` requires a `P12` CEO agent or a `P13` human supervisor.
 Executives can own delegated stream duties, but they do not override P13 gates.
 
+### 1.4.2 Agent Metrics And OKR Layer
+
+The 1.4.2 patch adds an agent-native KPI/OKR layer. It does not copy generic
+business KPI. It measures behavior that matters for coding and research agents:
+
+- `Reliability`: proportion and quality of outputs that are accepted or adopted
+- `Delegation`: ability to split work into suitable agents, offices, or P-levels
+- `Coordination`: net benefit after collaboration with other agents
+- `Correction`: speed and quality of fixing mistakes after feedback
+- `Exploration`: useful new routes, hypotheses, or implementation options
+
+Metric state is stored under:
+
+```text
+structure/worknet/runtime/metrics/
+├── agent_metrics.json
+├── events/
+│   └── metric-event-0001-reliability.json
+├── scorecards/
+│   └── scorecard-0001.json
+├── okrs/
+│   └── okr-0001.json
+└── metrics_log.jsonl
+```
+
+Useful commands:
+
+```bash
+structure-rule metrics-init
+structure-rule metric-show
+structure-rule metric-show --metric Reliability
+structure-rule metric-record \
+  --agent subagent-0001 \
+  --metric Reliability \
+  --score 5 \
+  --stream stream-0001 \
+  --evidence "Output accepted with minor edits."
+structure-rule scorecard-build --agent subagent-0001 --stream stream-0001
+structure-rule okr-set \
+  --agent subagent-0001 \
+  --objective "Improve useful exploration." \
+  --metric Exploration \
+  --target 4
+structure-rule okr-review okr-0001
+structure-rule metrics-status
+```
+
+Scores use a 0-5 scale and are evidence-backed. OKRs target the agent behavior
+metrics directly rather than external business numbers.
+
 ## Local Network Model
 
 Agent GitHub Worknet stores local collaboration objects under:
@@ -602,6 +662,7 @@ Model-agent actions also pass through governance checks:
 - stream runtime authority is expressed through P1-P13 corporate levels
 - P12 CEO agents still cannot override P13 human gates
 - executive appointments require a P12 CEO agent or P13 human supervisor
+- agent metrics are evidence-backed stream records, not hidden model judgments
 
 Duplicate protection is built in:
 
@@ -657,12 +718,12 @@ the path toward the 1.0 closure release.
 Current stable version:
 
 ```text
-1.4.1
+1.4.2
 ```
 
-The 1.4.1 release adds the executive layer on top of the stream runtime:
-COO/CTO/CFO/CSO/CRO offices, CEO appointments, executive delegation, executive
-reports, and board status.
+The 1.4.2 release adds agent-native KPI/OKR metrics: Reliability, Delegation,
+Coordination, Correction, Exploration, scorecards, OKRs, metric events, and
+metrics status.
 
 ## Philosophy
 

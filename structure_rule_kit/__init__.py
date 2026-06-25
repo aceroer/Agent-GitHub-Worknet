@@ -57,6 +57,16 @@ from .handoff import build_handoff_pack
 from .mcp_manifest import build_mcp_manifest
 from .mcp_scaffold import scaffold_mcp
 from .mcp_server import list_resources, read_resource, run_server
+from .metrics import (
+    load_metric_definitions,
+    metric_record,
+    metric_show,
+    metrics_init,
+    metrics_status,
+    okr_review,
+    okr_set,
+    scorecard_build,
+)
 from .model_api import (
     build_model_messages,
     load_model_providers,
@@ -198,7 +208,12 @@ __all__ = [
     "load_policy",
     "load_roles",
     "load_config",
+    "load_metric_definitions",
     "merge_pr",
+    "metric_record",
+    "metric_show",
+    "metrics_init",
+    "metrics_status",
     "model_call",
     "model_capability_check",
     "model_config_init",
@@ -206,6 +221,8 @@ __all__ = [
     "model_provider_set",
     "model_request_build",
     "policy_show",
+    "okr_review",
+    "okr_set",
     "role_show",
     "run_agent_task",
     "runtime_init",
@@ -215,6 +232,7 @@ __all__ = [
     "read_resource",
     "scan_repo_map",
     "sandbox_check",
+    "scorecard_build",
     "scaffold_mcp",
     "scaffold_skill",
     "snapshot_network",

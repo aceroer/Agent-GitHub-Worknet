@@ -56,6 +56,15 @@ from .handoff import build_handoff_pack
 from .mcp_manifest import build_mcp_manifest
 from .mcp_scaffold import scaffold_mcp
 from .mcp_server import run_server
+from .metrics import (
+    metric_record,
+    metric_show,
+    metrics_init,
+    metrics_status,
+    okr_review,
+    okr_set,
+    scorecard_build,
+)
 from .model_api import (
     load_model_providers,
     model_call,
@@ -728,6 +737,49 @@ def main(argv: list[str] | None = None) -> int:
     executive_report_parser.add_argument("--stream", default="")
     executive_report_parser.add_argument("--summary", default="")
     executive_report_parser.add_argument("--by", default="")
+
+    metrics_init_parser = subparsers.add_parser("metrics-init", help="Initialize agent KPI/OKR metrics")
+    metrics_init_parser.add_argument("--path", default=".")
+    metrics_init_parser.add_argument("--force", action="store_true")
+
+    metric_show_parser = subparsers.add_parser("metric-show", help="Show agent behavior metric definitions")
+    metric_show_parser.add_argument("--path", default=".")
+    metric_show_parser.add_argument("--metric", default="")
+    metric_show_parser.add_argument("--json", action="store_true")
+
+    metric_record_parser = subparsers.add_parser("metric-record", help="Record one agent behavior metric event")
+    metric_record_parser.add_argument("--path", default=".")
+    metric_record_parser.add_argument("--agent", default="")
+    metric_record_parser.add_argument("--metric", required=True)
+    metric_record_parser.add_argument("--score", type=int, required=True)
+    metric_record_parser.add_argument("--stream", default="")
+    metric_record_parser.add_argument("--issue", default="")
+    metric_record_parser.add_argument("--evidence", default="")
+    metric_record_parser.add_argument("--evaluator", default="")
+
+    scorecard_parser = subparsers.add_parser("scorecard-build", help="Build an agent metric scorecard")
+    scorecard_parser.add_argument("--path", default=".")
+    scorecard_parser.add_argument("--agent", default="")
+    scorecard_parser.add_argument("--stream", default="")
+    scorecard_parser.add_argument("--json", action="store_true")
+
+    okr_set_parser = subparsers.add_parser("okr-set", help="Set an agent-native OKR")
+    okr_set_parser.add_argument("--path", default=".")
+    okr_set_parser.add_argument("--agent", default="")
+    okr_set_parser.add_argument("--objective", default="")
+    okr_set_parser.add_argument("--metric", default="")
+    okr_set_parser.add_argument("--target", type=float, default=0.0)
+    okr_set_parser.add_argument("--stream", default="")
+    okr_set_parser.add_argument("--owner", default="")
+
+    okr_review_parser = subparsers.add_parser("okr-review", help="Review an agent-native OKR against scorecards")
+    okr_review_parser.add_argument("okr")
+    okr_review_parser.add_argument("--path", default=".")
+    okr_review_parser.add_argument("--json", action="store_true")
+
+    metrics_status_parser = subparsers.add_parser("metrics-status", help="Show agent metrics status")
+    metrics_status_parser.add_argument("--path", default=".")
+    metrics_status_parser.add_argument("--json", action="store_true")
 
     args = parser.parse_args(argv)
 
@@ -1677,6 +1729,91 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(f"Report {report['id']}: {Path(report['output'])}")
         return 0
+
+    if args.command == "metrics-init":
+        report = metrics_init(args.path, force=args.force)
+        print(f"Metrics: {Path(report['output'])}")
+        print(f"Definitions: {Path(report['definitions'])}")
+        return 0
+
+    if args.command == "metric-show":
+        report = metric_show(args.path, metric=args.metric)
+        if args.json:
+            print(json.dumps(report, indent=2))
+        elif args.metric:
+            definition = report["definition"]
+            print(f"{report['metric']}")
+            print(definition["question"])
+        else:
+            print(f"Metric model version: {report['version']}")
+            for metric, definition in report["metrics"].items():
+                print(f"- {metric}: {definition['question']}")
+        return 0
+
+    if args.command == "metric-record":
+        try:
+            report = metric_record(
+                args.path,
+                agent=args.agent,
+                metric=args.metric,
+                score=args.score,
+                stream=args.stream,
+                issue=args.issue,
+                evidence=args.evidence,
+                evaluator=args.evaluator,
+            )
+        except ValueError as exc:
+            print(str(exc))
+            return 1
+        print(f"Metric {report['id']}: {Path(report['output'])}")
+        return 0
+
+    if args.command == "scorecard-build":
+        report = scorecard_build(args.path, agent=args.agent, stream=args.stream)
+        if args.json:
+            print(json.dumps(report["payload"], indent=2))
+        else:
+            print(f"Scorecard {report['id']}: {Path(report['output'])}")
+            print(f"Overall: {report['payload']['overall']}")
+        return 0
+
+    if args.command == "okr-set":
+        try:
+            report = okr_set(
+                args.path,
+                agent=args.agent,
+                objective=args.objective,
+                metric=args.metric,
+                target=args.target,
+                stream=args.stream,
+                owner=args.owner,
+            )
+        except ValueError as exc:
+            print(str(exc))
+            return 1
+        print(f"OKR {report['id']}: {Path(report['output'])}")
+        return 0
+
+    if args.command == "okr-review":
+        report = okr_review(args.path, okr=args.okr)
+        if args.json:
+            print(json.dumps(report["review"], indent=2))
+        else:
+            print("ACHIEVED" if report["review"]["achieved"] else "ACTIVE")
+            print(f"Current: {report['review']['current']}")
+            print(f"Target: {report['review']['target']}")
+        return 0
+
+    if args.command == "metrics-status":
+        report = metrics_status(args.path)
+        if args.json:
+            print(json.dumps(report, indent=2))
+        else:
+            print("READY" if report["ready"] else "NEEDS SETUP")
+            print(f"Metric events: {report['metric_events']}")
+            print(f"Scorecards: {report['scorecards']}")
+            print(f"OKRs: {report['okrs']}")
+        return 0 if report["ready"] else 1
 
     parser.error("Unknown command")
     return 2
