@@ -46,6 +46,8 @@ local notes.
 - Active roles should leave artifacts such as reports, votes, reviews, verification notes, or gate verdicts.
 - Roles without independent artifacts should be marked record-only.
 - Use `structure-rule role-report` for QA, Docs, CEO, release, or other non-executive reports.
+- Use `subagent-spawn -> subagent-run -> subagent-ingest` when a named worker should be more than a document label.
+- External agents such as Codex, Pi, mini-swe-agent, OpenHands, and Sandbox Agent are runner backends; GNW keeps the work hub, gates, and trace records.
 
 ## Handoff Protocol
 

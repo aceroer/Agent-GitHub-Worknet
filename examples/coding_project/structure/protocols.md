@@ -173,6 +173,31 @@ Model-backed work is gated:
 - Store responses as records rather than hidden transient output.
 - Treat model output as a proposal until reviewed, verified, or adopted.
 
+## Agent Runtime Hub Protocol
+
+GNW is the work hub, governance hub, and trace hub. External coding agents are
+runner backends.
+
+Supported runner adapters can include Codex, Pi, mini-swe-agent, OpenHands,
+Sandbox Agent, and local subprocess runners. GNW should not depend on one
+worker runtime when a spawn spec, prompt packet, event stream, and ingest record
+can express the common workflow.
+
+Use the hub flow:
+
+```text
+subagent-spawn -> subagent-run -> subagent-ingest -> role-report
+```
+
+`subagent-spawn` creates the bounded task packet and prompt. `subagent-run`
+records a dry-run or explicit execution attempt. `subagent-ingest` turns worker
+output into a role artifact. A CEO decision should cite ingested artifacts, not
+only the existence of named employees.
+
+Remote publication remains governed by the Publication Gate Protocol. A runner
+adapter may do work, but it does not receive implicit authority to commit, push,
+open PRs, or write remote comments.
+
 ## GitHub Protocol
 
 GitHub sync is explicit:

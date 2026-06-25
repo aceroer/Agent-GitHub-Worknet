@@ -298,6 +298,15 @@ Harden GNW publication governance after real trial feedback:
 - protocol split between local GitHub Worknet and remote GitHub publication
 - real incident trace for future workflow audits
 
+## Version 1.5.3
+
+Add the Agent Runtime Hub layer:
+
+- runner adapters for Codex, Pi, mini-swe-agent, OpenHands, Sandbox Agent, and local subprocesses
+- subagent spawn specs with prompt/context packets
+- dry-run and explicit execution records for worker agents
+- ingest records that turn worker output into role reports
+
 ## Deferred Ideas
 
 - Optional project presets, only if they support the scriptable integration layer.
@@ -541,6 +550,31 @@ Model-backed work is gated:
 - Require a matching capability token for live model calls.
 - Store responses as records rather than hidden transient output.
 - Treat model output as a proposal until reviewed, verified, or adopted.
+
+## Agent Runtime Hub Protocol
+
+GNW is the work hub, governance hub, and trace hub. External coding agents are
+runner backends.
+
+Supported runner adapters can include Codex, Pi, mini-swe-agent, OpenHands,
+Sandbox Agent, and local subprocess runners. GNW should not depend on one
+worker runtime when a spawn spec, prompt packet, event stream, and ingest record
+can express the common workflow.
+
+Use the hub flow:
+
+```text
+subagent-spawn -> subagent-run -> subagent-ingest -> role-report
+```
+
+`subagent-spawn` creates the bounded task packet and prompt. `subagent-run`
+records a dry-run or explicit execution attempt. `subagent-ingest` turns worker
+output into a role artifact. A CEO decision should cite ingested artifacts, not
+only the existence of named employees.
+
+Remote publication remains governed by the Publication Gate Protocol. A runner
+adapter may do work, but it does not receive implicit authority to commit, push,
+open PRs, or write remote comments.
 
 ## GitHub Protocol
 

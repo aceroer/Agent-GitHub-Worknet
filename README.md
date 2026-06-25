@@ -56,6 +56,13 @@ The 1.4.4 protocol layer fixes the operating contracts:
 object protocol -> authority protocol -> workflow protocol -> roundtable protocol -> handoff protocol
 ```
 
+The 1.5.3 Agent Runtime Hub layer turns governed subagents into runnable worker
+interfaces without competing with existing coding agents:
+
+```text
+spawn spec -> runner adapter -> event record -> ingest -> role-report
+```
+
 ## Install
 
 ```bash
@@ -189,6 +196,24 @@ Check publication gates before sensitive actions:
 structure-rule gate-check --action commit
 structure-rule gate-check --action remote-push
 structure-rule gate-check --action gh-pr-create
+```
+
+Spawn a real worker interface for Codex, Pi, mini-swe-agent, OpenHands,
+Sandbox Agent, or a local subprocess:
+
+```bash
+structure-rule agent-hub-init
+structure-rule runner-adapters
+structure-rule subagent-spawn \
+  --subagent subagent-0001 \
+  --runner codex \
+  --role "QA Lead" \
+  --issue issue-0001 \
+  --stream stream-0001 \
+  --task "Review the test plan and report gaps."
+structure-rule subagent-run spawn-0001
+structure-rule subagent-ingest spawn-0001 --summary "QA review completed." --status verdict
+structure-rule subagent-events --spawn spawn-0001
 ```
 
 Record agent-native KPI/OKR signals:
@@ -869,6 +894,8 @@ Model-agent actions also pass through governance checks:
 - agent metrics are evidence-backed stream records, not hidden model judgments
 - roundtable organization reviews require a P12 CEO agent or P13 human supervisor
 - weighted votes use explicit weights or actor P-level authority
+- external runner agents enter through Agent Runtime Hub spawn specs and do not
+  receive implicit commit, push, PR, or remote-comment authority
 - project protocols are fixed in `structure/protocols.md` and must be updated
   when workflow, authority, or data contracts change
 
@@ -903,6 +930,12 @@ structure-rule session-start --task "implement parser"
 structure-rule session-end --done "added parser" --next "review tests"
 structure-rule agent-export --target codex
 structure-rule skill-export --name project-structure
+structure-rule agent-hub-init
+structure-rule runner-adapters
+structure-rule subagent-spawn --runner codex --task "review tests"
+structure-rule subagent-run spawn-0001
+structure-rule subagent-ingest spawn-0001 --summary "worker report adopted"
+structure-rule subagent-events --spawn spawn-0001
 structure-rule agent-sync --target codex
 structure-rule mcp-server
 structure-rule-mcp-server --stdio
@@ -927,12 +960,12 @@ the path toward the 1.0 closure release.
 Current stable version:
 
 ```text
-1.5.2
+1.5.3
 ```
 
-The 1.5.2 release hardens GNW publication governance: active roles need
-artifacts, non-executive roles can write `role-report` records, and commit,
-push, and GitHub PR publication paths can be checked with `gate-check`.
+The 1.5.3 release adds the Agent Runtime Hub layer: GNW can create subagent
+spawn specs, generate prompt/context packets, route work through runner adapters,
+record run events, and ingest worker output into role reports.
 
 ## Philosophy
 

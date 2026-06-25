@@ -3,6 +3,14 @@
 from .agent_ready import check_agent_ready
 from .agent_brief import build_agent_brief
 from .agent_export import export_agent, export_all_agents
+from .agent_hub import (
+    agent_hub_init,
+    runner_adapters,
+    subagent_events,
+    subagent_ingest,
+    subagent_run,
+    subagent_spawn,
+)
 from .config import load_config, write_config
 from .context_git import (
     checkout_context_branch,
@@ -160,6 +168,7 @@ __all__ = [
     "add_comment",
     "actor_weight",
     "agent_promote",
+    "agent_hub_init",
     "assign_issue",
     "assignment_create",
     "build_agent_brief",
@@ -254,6 +263,7 @@ __all__ = [
     "okr_set",
     "role_show",
     "role_report",
+    "runner_adapters",
     "roundtable_init",
     "roundtable_status",
     "run_agent_task",
@@ -275,10 +285,14 @@ __all__ = [
     "stream_event",
     "stream_show",
     "stream_start",
+    "subagent_events",
+    "subagent_ingest",
+    "subagent_run",
     "sync_agent",
     "sync_network",
     "subagent_create",
     "subagent_plan",
+    "subagent_spawn",
     "secret_scan",
     "timeline",
     "token_is_active",

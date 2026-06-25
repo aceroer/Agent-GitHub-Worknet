@@ -6,6 +6,14 @@ from pathlib import Path
 
 from .agent_brief import build_agent_brief
 from .agent_export import export_agent, export_all_agents
+from .agent_hub import (
+    agent_hub_init,
+    runner_adapters,
+    subagent_events,
+    subagent_ingest,
+    subagent_run,
+    subagent_spawn,
+)
 from .agent_ready import check_agent_ready
 from .agent_sync import sync_agent
 from .config import write_config
@@ -785,6 +793,45 @@ def main(argv: list[str] | None = None) -> int:
     role_report_parser.add_argument("--summary", default="")
     role_report_parser.add_argument("--by", default="")
     role_report_parser.add_argument("--status", default="artifact")
+
+    agent_hub_init_parser = subparsers.add_parser("agent-hub-init", help="Initialize the Agent Runtime Hub layer")
+    agent_hub_init_parser.add_argument("--path", default=".")
+    agent_hub_init_parser.add_argument("--force", action="store_true")
+
+    runner_adapters_parser = subparsers.add_parser("runner-adapters", help="Show supported external agent runner adapters")
+    runner_adapters_parser.add_argument("--path", default=".")
+    runner_adapters_parser.add_argument("--json", action="store_true")
+
+    subagent_spawn_parser = subparsers.add_parser("subagent-spawn", help="Create a runnable subagent spawn spec and prompt")
+    subagent_spawn_parser.add_argument("--path", default=".")
+    subagent_spawn_parser.add_argument("--subagent", default="")
+    subagent_spawn_parser.add_argument("--runner", default="local")
+    subagent_spawn_parser.add_argument("--role", default="")
+    subagent_spawn_parser.add_argument("--issue", default="")
+    subagent_spawn_parser.add_argument("--stream", default="")
+    subagent_spawn_parser.add_argument("--task", default="")
+    subagent_spawn_parser.add_argument("--cmd", default="")
+
+    subagent_run_parser = subparsers.add_parser("subagent-run", help="Run or dry-run a subagent spawn through a runner adapter")
+    subagent_run_parser.add_argument("spawn")
+    subagent_run_parser.add_argument("--path", default=".")
+    subagent_run_parser.add_argument("--apply", action="store_true")
+    subagent_run_parser.add_argument("--cmd", default="")
+    subagent_run_parser.add_argument("--timeout", type=int, default=120)
+    subagent_run_parser.add_argument("--json", action="store_true")
+
+    subagent_ingest_parser = subparsers.add_parser("subagent-ingest", help="Ingest a subagent output as a role report")
+    subagent_ingest_parser.add_argument("spawn")
+    subagent_ingest_parser.add_argument("--path", default=".")
+    subagent_ingest_parser.add_argument("--summary", default="")
+    subagent_ingest_parser.add_argument("--artifact", default="")
+    subagent_ingest_parser.add_argument("--status", default="artifact")
+    subagent_ingest_parser.add_argument("--by", default="")
+
+    subagent_events_parser = subparsers.add_parser("subagent-events", help="Show Agent Runtime Hub events")
+    subagent_events_parser.add_argument("--path", default=".")
+    subagent_events_parser.add_argument("--spawn", default="")
+    subagent_events_parser.add_argument("--json", action="store_true")
 
     metrics_init_parser = subparsers.add_parser("metrics-init", help="Initialize agent KPI/OKR metrics")
     metrics_init_parser.add_argument("--path", default=".")
@@ -1885,6 +1932,89 @@ def main(argv: list[str] | None = None) -> int:
             status=args.status,
         )
         print(f"Role report {report['id']}: {Path(report['output'])}")
+        return 0
+
+    if args.command == "agent-hub-init":
+        report = agent_hub_init(args.path, force=args.force)
+        print(f"Agent hub: {Path(report['output'])}")
+        print(f"Adapters: {Path(report['adapters'])}")
+        return 0
+
+    if args.command == "runner-adapters":
+        report = runner_adapters(args.path)
+        if args.json:
+            print(json.dumps(report, indent=2))
+        else:
+            print(f"Runner adapter version: {report['version']}")
+            for name, adapter in report["adapters"].items():
+                print(f"- {name}: {adapter['kind']} - {adapter['summary']}")
+        return 0
+
+    if args.command == "subagent-spawn":
+        try:
+            report = subagent_spawn(
+                args.path,
+                subagent=args.subagent,
+                runner=args.runner,
+                role=args.role,
+                issue=args.issue,
+                stream=args.stream,
+                task=args.task,
+                command=args.cmd,
+            )
+        except (FileNotFoundError, ValueError) as exc:
+            print(str(exc))
+            return 1
+        print(f"Spawn {report['id']}: {Path(report['output'])}")
+        print(f"Prompt: {Path(report['prompt'])}")
+        return 0
+
+    if args.command == "subagent-run":
+        try:
+            report = subagent_run(
+                args.path,
+                spawn=args.spawn,
+                apply=args.apply,
+                command=args.cmd,
+                timeout=args.timeout,
+            )
+        except FileNotFoundError as exc:
+            print(str(exc))
+            return 1
+        if args.json:
+            print(json.dumps(report["payload"], indent=2))
+        else:
+            print(f"{report['payload']['status'].upper()}: {report['id']}")
+            print(f"Run: {Path(report['output'])}")
+            if report["payload"].get("stderr"):
+                print(report["payload"]["stderr"])
+        return 0 if report["ok"] else 1
+
+    if args.command == "subagent-ingest":
+        try:
+            report = subagent_ingest(
+                args.path,
+                spawn=args.spawn,
+                summary=args.summary,
+                artifact=args.artifact,
+                status=args.status,
+                by=args.by,
+            )
+        except FileNotFoundError as exc:
+            print(str(exc))
+            return 1
+        print(f"Ingest {report['id']}: {Path(report['output'])}")
+        print(f"Role report: {Path(report['role_report']['output'])}")
+        return 0
+
+    if args.command == "subagent-events":
+        report = subagent_events(args.path, spawn=args.spawn)
+        if args.json:
+            print(json.dumps(report, indent=2))
+        else:
+            print(f"Events: {report['count']}")
+            for event in report["events"]:
+                print(f"- {event['timestamp']} {event['event']}")
         return 0
 
     if args.command == "metrics-init":

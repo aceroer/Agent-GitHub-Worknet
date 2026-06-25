@@ -155,6 +155,15 @@ Harden GNW publication governance after real trial feedback:
 - protocol split between local GitHub Worknet and remote GitHub publication
 - real incident trace for future workflow audits
 
+## Version 1.5.3
+
+Add the Agent Runtime Hub layer:
+
+- runner adapters for Codex, Pi, mini-swe-agent, OpenHands, Sandbox Agent, and local subprocesses
+- subagent spawn specs with prompt/context packets
+- dry-run and explicit execution records for worker agents
+- ingest records that turn worker output into role reports
+
 ## Deferred Ideas
 
 - Optional presets, only if they support the integration tools.
