@@ -96,6 +96,45 @@ The default work flow is:
 
 Do not skip verification unless the limitation is recorded.
 
+## Task Scale Routing Protocol
+
+Choose the lightest operating mode that can preserve quality and traceability:
+
+| Task Scale | Recommended Mode | Use When | Avoid |
+| --- | --- | --- | --- |
+| Small | Single-thread agent session | One narrow edit, one obvious owner, low coordination risk. | CEO/executive boards, roundtables, or heavy worknet ceremony. |
+| Medium | GitHub worknet flow | Issue-to-branch-to-PR traceability matters, but the route is still mostly linear. | Full company architecture unless there are real cross-role tradeoffs. |
+| Large | Company architecture | Multi-part delivery, unclear route, competing risks, parallel agents, or human board governance are useful. | Treating the CEO layer as a replacement for verification or human gates. |
+
+The company architecture is a coordination instrument, not a default wrapper
+around every task. If the organization overhead is larger than the task, keep the
+task single-threaded and record only the minimal worknet evidence needed.
+
+Task size is not the only routing input. Risk can selectively raise the
+governance mode without requiring a full company:
+
+- Small task with high permission, secret, legal, or remote-publication risk: add
+  the relevant specialist gate, usually CSO or P13, while keeping execution
+  single-threaded.
+- Medium task with low risk: keep the worknet flow lean and avoid executive
+  ceremony.
+- Large task with multi-party decisions: use CEO/company architecture and
+  record executive reports.
+- Any task with remote writes, live model calls, broad file writes, or
+  publication: require explicit approval and keep the gate visible in the
+  worknet.
+
+## Worknet Concurrency Protocol
+
+Until the runtime provides atomic ID allocation or file locking, worknet object
+writes must be serialized. Do not run concurrent commands that create or update
+issues, assignments, executive reports, stream events, meetings, votes, PR
+records, or other numbered worknet objects.
+
+Read-only inspection may be parallel. Writes that allocate IDs or append runtime
+events should be sequenced, then checked with JSON validation or the relevant
+status command before further delegation.
+
 ## Roundtable Protocol
 
 Use a roundtable when a decision benefits from deliberation:

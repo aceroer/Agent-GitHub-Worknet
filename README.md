@@ -746,6 +746,12 @@ The protocol file covers:
   executive offices, and lower P-level agents
 - workflow protocol from intake to route, delegation, execution, verification,
   review, and closure
+- task scale routing: small tasks stay single-threaded, medium tasks use
+  GitHub worknet traceability, and large tasks justify CEO/company structure
+- risk-aware routing: high-risk small tasks can add specialist gates without
+  creating a full company
+- worknet concurrency protocol: numbered object writes are serialized until
+  atomic ID allocation or file locking is available
 - roundtable protocol for minutes, weighted votes, and organization review
 - model API protocol for dry-runs, request packets, capability tokens, and
   response records

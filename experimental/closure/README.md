@@ -34,6 +34,7 @@ experimental/closure/
 ├── README.md
 ├── ROADMAP.md
 ├── REAL_TRACE_2026-06-16.md
+├── REAL_TRACE_2026-06-25_SERFBOUND_GNW_TRIAL.md
 ├── github_config.example.json
 └── scripts/
     ├── github_doctor.py
@@ -47,6 +48,13 @@ stable CLI, or be replaced by a cleaner implementation in a later release.
 
 The main rule is simple: keep real traces visible and reproducible, but do not
 let experimental assumptions leak into the stable package API too early.
+
+## Trace Notes
+
+`REAL_TRACE_2026-06-25_SERFBOUND_GNW_TRIAL.md` records the first
+company-style GNW trial. It is useful not only as a GitHub workflow trace, but
+also as a management trace: CEO delegation, office ownership, remote-write
+gates, and the need for locked or atomic worknet object writes.
 
 ## Quick Checks
 

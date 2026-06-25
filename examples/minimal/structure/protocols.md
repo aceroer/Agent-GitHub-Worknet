@@ -23,6 +23,15 @@ local notes.
 - Verify work before marking it complete.
 - Record limitations when checks cannot run.
 
+## Task Scale Routing Protocol
+
+- Small tasks should stay single-threaded unless traceability needs more.
+- Medium tasks should use GitHub worknet flow when issue, branch, PR, and sync records matter.
+- Large tasks can use CEO/company architecture when parallel roles, route uncertainty, or human board governance are useful.
+- Do not wrap every task in a company structure; use the lightest mode that preserves quality and traceability.
+- Risk can selectively raise governance without creating a full company: add CSO, P13, or another specialist gate for secrets, legal boundaries, broad writes, live model calls, or remote publication.
+- Worknet object writes must be serialized until atomic ID allocation or file locking exists; parallel reads are fine, but numbered object creation and stream/event writes should be sequenced.
+
 ## Authority Protocol
 
 - Human owners have final authority.
