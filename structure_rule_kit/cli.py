@@ -16,6 +16,15 @@ from .agent_hub import (
 )
 from .agent_ready import check_agent_ready
 from .agent_sync import sync_agent
+from .company import (
+    company_init,
+    company_status,
+    office_action_report,
+    office_action_start,
+    office_method_list,
+    office_method_register,
+    office_method_show,
+)
 from .config import write_config
 from .context_git import (
     checkout_context_branch,
@@ -793,6 +802,52 @@ def main(argv: list[str] | None = None) -> int:
     role_report_parser.add_argument("--summary", default="")
     role_report_parser.add_argument("--by", default="")
     role_report_parser.add_argument("--status", default="artifact")
+
+    company_init_parser = subparsers.add_parser("company-init", help="Initialize Agent Company office method registry")
+    company_init_parser.add_argument("--path", default=".")
+    company_init_parser.add_argument("--force", action="store_true")
+
+    office_method_list_parser = subparsers.add_parser("office-method-list", help="List Agent Company office methods")
+    office_method_list_parser.add_argument("--path", default=".")
+    office_method_list_parser.add_argument("--office", default="")
+    office_method_list_parser.add_argument("--source", default="")
+    office_method_list_parser.add_argument("--json", action="store_true")
+
+    office_method_show_parser = subparsers.add_parser("office-method-show", help="Show one Agent Company office method")
+    office_method_show_parser.add_argument("method")
+    office_method_show_parser.add_argument("--path", default=".")
+    office_method_show_parser.add_argument("--json", action="store_true")
+
+    office_method_register_parser = subparsers.add_parser("office-method-register", help="Register a local Agent Company office method")
+    office_method_register_parser.add_argument("--path", default=".")
+    office_method_register_parser.add_argument("--name", required=True)
+    office_method_register_parser.add_argument("--office", required=True)
+    office_method_register_parser.add_argument("--title", default="")
+    office_method_register_parser.add_argument("--purpose", default="")
+    office_method_register_parser.add_argument("--source", default="local")
+    office_method_register_parser.add_argument("--expected-artifact", default="")
+    office_method_register_parser.add_argument("--publication-authority", default="none")
+
+    office_action_start_parser = subparsers.add_parser("office-action-start", help="Start an office method action on a stream or issue")
+    office_action_start_parser.add_argument("--path", default=".")
+    office_action_start_parser.add_argument("--method", required=True)
+    office_action_start_parser.add_argument("--office", default="")
+    office_action_start_parser.add_argument("--stream", default="")
+    office_action_start_parser.add_argument("--issue", default="")
+    office_action_start_parser.add_argument("--actor", default="")
+    office_action_start_parser.add_argument("--objective", default="")
+
+    office_action_report_parser = subparsers.add_parser("office-action-report", help="Report the result of an office method action")
+    office_action_report_parser.add_argument("action")
+    office_action_report_parser.add_argument("--path", default=".")
+    office_action_report_parser.add_argument("--summary", default="")
+    office_action_report_parser.add_argument("--status", default="artifact")
+    office_action_report_parser.add_argument("--evidence", default="")
+    office_action_report_parser.add_argument("--by", default="")
+
+    company_status_parser = subparsers.add_parser("company-status", help="Show Agent Company office method status")
+    company_status_parser.add_argument("--path", default=".")
+    company_status_parser.add_argument("--json", action="store_true")
 
     agent_hub_init_parser = subparsers.add_parser("agent-hub-init", help="Initialize the Agent Runtime Hub layer")
     agent_hub_init_parser.add_argument("--path", default=".")
@@ -1933,6 +1988,99 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(f"Role report {report['id']}: {Path(report['output'])}")
         return 0
+
+    if args.command == "company-init":
+        report = company_init(args.path, force=args.force)
+        print(f"Agent Company: {Path(report['output'])}")
+        print(f"Office methods: {Path(report['registry'])}")
+        return 0
+
+    if args.command == "office-method-list":
+        report = office_method_list(args.path, office=args.office, source=args.source)
+        if args.json:
+            print(json.dumps(report, indent=2))
+        else:
+            print(f"Office methods: {report['count']}")
+            for name, method in report["methods"].items():
+                print(f"- {name}: {method['office']} - {method['title']} ({method['source']})")
+        return 0
+
+    if args.command == "office-method-show":
+        try:
+            report = office_method_show(args.path, args.method)
+        except ValueError as exc:
+            print(str(exc))
+            return 1
+        if args.json:
+            print(json.dumps(report, indent=2))
+        else:
+            definition = report["definition"]
+            print(f"{report['method']}: {definition['title']}")
+            print(f"Office: {definition['office']}")
+            print(f"Source: {definition['source']}")
+            print(f"Purpose: {definition['purpose']}")
+            print(f"Expected artifact: {definition['expected_artifact']}")
+            print(f"Publication authority: {definition['publication_authority']}")
+        return 0
+
+    if args.command == "office-method-register":
+        report = office_method_register(
+            args.path,
+            name=args.name,
+            office=args.office,
+            title=args.title,
+            purpose=args.purpose,
+            source=args.source,
+            expected_artifact=args.expected_artifact,
+            publication_authority=args.publication_authority,
+        )
+        print(f"Registered office method {report['method']}: {Path(report['output'])}")
+        return 0
+
+    if args.command == "office-action-start":
+        try:
+            report = office_action_start(
+                args.path,
+                method=args.method,
+                office=args.office,
+                stream=args.stream,
+                issue=args.issue,
+                actor=args.actor,
+                objective=args.objective,
+            )
+        except (ValueError, FileNotFoundError) as exc:
+            print(str(exc))
+            return 1
+        print(f"Office action {report['id']}: {Path(report['output'])}")
+        return 0
+
+    if args.command == "office-action-report":
+        try:
+            report = office_action_report(
+                args.path,
+                action=args.action,
+                summary=args.summary,
+                status=args.status,
+                evidence=args.evidence,
+                by=args.by,
+            )
+        except FileNotFoundError as exc:
+            print(str(exc))
+            return 1
+        print(f"Office report {report['id']}: {Path(report['output'])}")
+        return 0
+
+    if args.command == "company-status":
+        report = company_status(args.path)
+        if args.json:
+            print(json.dumps(report, indent=2))
+        else:
+            print("READY" if report["ready"] else "NEEDS SETUP")
+            print(f"Methods: {report['methods']}")
+            print(f"Actions: {report['actions']}")
+            print(f"Reports: {report['reports']}")
+            print(f"Company log events: {report['company_log_events']}")
+        return 0 if report["ready"] else 1
 
     if args.command == "agent-hub-init":
         report = agent_hub_init(args.path, force=args.force)

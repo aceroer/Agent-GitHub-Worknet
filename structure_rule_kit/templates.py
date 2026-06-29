@@ -307,6 +307,17 @@ Add the Agent Runtime Hub layer:
 - dry-run and explicit execution records for worker agents
 - ingest records that turn worker output into role reports
 
+## Version 1.6
+
+Begin the Agent Company transition:
+
+- office method registry
+- default CEO/CTO/CSO/CFO/CRO/QA/Release/Retro methods
+- office action records
+- office reports linked to streams and issues
+- external gstack absorption record
+- preserve GNW as the GitHub worknet substrate
+
 ## Deferred Ideas
 
 - Optional project presets, only if they support the scriptable integration layer.
@@ -575,6 +586,42 @@ only the existence of named employees.
 Remote publication remains governed by the Publication Gate Protocol. A runner
 adapter may do work, but it does not receive implicit authority to commit, push,
 open PRs, or write remote comments.
+
+## Agent Company Office Method Protocol
+
+Office methods define how company roles act. Skills are methods; Agent Company
+is the governance runtime.
+
+Use office methods when a role needs a repeatable action pattern:
+
+- CEO route review
+- CTO implementation planning
+- CSO security and boundary audit
+- CFO scope and cost control
+- CRO developer or reader experience review
+- QA verification
+- release gate review
+- retrospective learning
+
+The standard flow is:
+
+```text
+company-init -> office-action-start -> office-action-report -> stream evidence
+```
+
+Each active office action must name:
+
+- method
+- office
+- stream or issue
+- actor
+- objective
+- expected artifact
+- required verification
+- publication authority
+
+Office methods can recommend, block, or report. They do not bypass P13 human
+authority, capability tokens, or publication gates.
 
 ## GitHub Protocol
 

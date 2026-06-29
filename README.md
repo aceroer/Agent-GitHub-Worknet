@@ -67,6 +67,12 @@ interfaces without competing with existing coding agents:
 spawn spec -> runner adapter -> event record -> ingest -> role-report
 ```
 
+The 1.6 Agent Company layer adds office methods above the GitHub worknet:
+
+```text
+office method -> office action -> office report -> stream evidence
+```
+
 ## Install
 
 ```bash
@@ -242,6 +248,24 @@ structure-rule vote-tally vote-0001 --close
 structure-rule org-apply --applicant subagent-0002 --kind promotion --target P7 --meeting meeting-0001
 structure-rule org-review application-0001 --decision approved --reviewer subagent-0001
 structure-rule minutes-generate meeting-0001
+```
+
+Initialize Agent Company office methods:
+
+```bash
+structure-rule company-init
+structure-rule office-method-list
+structure-rule office-method-show cso-audit
+structure-rule office-action-start \
+  --method qa-verify \
+  --stream stream-0001 \
+  --issue issue-0001 \
+  --actor subagent-0001 \
+  --objective "Verify the release candidate."
+structure-rule office-action-report office-action-0001 \
+  --summary "Verification passed with documented gaps." \
+  --status verdict
+structure-rule company-status
 ```
 
 The sync report is written to:
@@ -970,6 +994,63 @@ Current stable version:
 The 1.5.3 release adds the Agent Runtime Hub layer: GNW can create subagent
 spawn specs, generate prompt/context packets, route work through runner adapters,
 record run events, and ingest worker output into role reports.
+
+## 1.6 Agent Company Office Methods
+
+The 1.6 layer starts the transition from Agent GitHub Worknet toward Agent
+Company. The GitHub worknet remains the substrate, but office methods define how
+company roles act.
+
+State is stored under:
+
+```text
+structure/worknet/runtime/company/
+├── office_methods.json
+├── actions/
+│   └── office-action-0001-qa-verify.json
+├── reports/
+│   └── office-report-0001-qa-verify.json
+└── company_log.jsonl
+```
+
+Default office methods include:
+
+- `ceo-review`: CEO route challenge and convergence verdict
+- `cto-plan`: architecture, implementation, and verification route
+- `cso-audit`: security, sandbox, command, secret, and publication boundary audit
+- `cfo-scope`: scope and cost control
+- `cro-devex`: reader, adopter, and developer-experience review
+- `qa-verify`: test matrix and verification evidence
+- `release-gate`: publication readiness and gate review
+- `retro-learn`: incident and learning capture
+
+Useful commands:
+
+```bash
+structure-rule company-init
+structure-rule office-method-list
+structure-rule office-method-list --office CSO
+structure-rule office-method-show release-gate
+structure-rule office-method-register \
+  --name docs-polish \
+  --office CRO \
+  --title "Docs Polish" \
+  --purpose "Review public docs before release."
+structure-rule office-action-start \
+  --method cso-audit \
+  --stream stream-0001 \
+  --issue issue-0001 \
+  --actor subagent-0001
+structure-rule office-action-report office-action-0001 \
+  --summary "No secret or publication blocker found." \
+  --status verdict \
+  --evidence "secret-scan and gate-check reviewed."
+structure-rule company-status
+```
+
+gstack is tracked as an external source of office-method depth under
+`experimental/company/external/gstack.md`. Its role skills are treated as
+methods that Agent Company can assign, constrain, and audit.
 
 ## Philosophy
 

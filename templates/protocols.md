@@ -198,6 +198,42 @@ Remote publication remains governed by the Publication Gate Protocol. A runner
 adapter may do work, but it does not receive implicit authority to commit, push,
 open PRs, or write remote comments.
 
+## Agent Company Office Method Protocol
+
+Office methods define how company roles act. Skills are methods; Agent Company
+is the governance runtime.
+
+Use office methods when a role needs a repeatable action pattern:
+
+- CEO route review
+- CTO implementation planning
+- CSO security and boundary audit
+- CFO scope and cost control
+- CRO developer or reader experience review
+- QA verification
+- release gate review
+- retrospective learning
+
+The standard flow is:
+
+```text
+company-init -> office-action-start -> office-action-report -> stream evidence
+```
+
+Each active office action must name:
+
+- method
+- office
+- stream or issue
+- actor
+- objective
+- expected artifact
+- required verification
+- publication authority
+
+Office methods can recommend, block, or report. They do not bypass P13 human
+authority, capability tokens, or publication gates.
+
 ## GitHub Protocol
 
 GitHub sync is explicit:

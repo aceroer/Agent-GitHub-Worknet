@@ -12,6 +12,16 @@ from .agent_hub import (
     subagent_spawn,
 )
 from .config import load_config, write_config
+from .company import (
+    company_init,
+    company_status,
+    load_office_methods,
+    office_action_report,
+    office_action_start,
+    office_method_list,
+    office_method_register,
+    office_method_show,
+)
 from .context_git import (
     checkout_context_branch,
     create_context_branch,
@@ -185,6 +195,8 @@ __all__ = [
     "check_agent_ready",
     "classify_command",
     "checkout_context_branch",
+    "company_init",
+    "company_status",
     "create_agent_task",
     "create_context_branch",
     "create_context_snapshot",
@@ -240,6 +252,7 @@ __all__ = [
     "load_policy",
     "load_roles",
     "load_config",
+    "load_office_methods",
     "load_metric_definitions",
     "merge_pr",
     "metric_record",
@@ -261,6 +274,11 @@ __all__ = [
     "org_review",
     "okr_review",
     "okr_set",
+    "office_action_report",
+    "office_action_start",
+    "office_method_list",
+    "office_method_register",
+    "office_method_show",
     "role_show",
     "role_report",
     "runner_adapters",
